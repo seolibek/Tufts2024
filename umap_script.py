@@ -107,8 +107,10 @@ def visualize_umap(data_reshaped, ground_truth, n_neighbors=15, min_dist=0.1, n_
     #     ani.save('umap_rotation.mp4', writer='ffmpeg', fps=30)
     return u
 
-def visualize_tsne(data_reshaped, ground_truth, perplexity, n_components, title = ''):
-  tsne = TSNE(n_components=n_components, perplexity=perplexity, learning_rate='auto', init='random', random_state=42)
+def visualize_tsne(data_reshaped, ground_truth, perp, n_components, title = ''):
+
+  
+  tsne = TSNE(n_components=n_components, perplexity=perp, learning_rate='auto', init='random', random_state=42)
   u = tsne.fit_transform(data_reshaped)
   # ax.scatter(u[:,0], u[:,1], u[:,2], c=ground_truth, s=4)
   # title = ''
@@ -211,8 +213,10 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
     dims = [1,2,3,4,5,6,10,30,50,100,150,200]
     if(tSNE):
        if (compare_dim):
-          for i in range(len(dims) - 3):
-            tsne_plot = visualize_tsne(data,ground_truth, perplexity=30,n_components = dims[i])
+          dims = [1,2,3,4]
+          for i in range(len(dims)):
+
+            tsne_plot = visualize_tsne(data,ground_truth, perp=30,n_components = dims[i])
             k_means_tsne_ari, k_means_tsne_labels = k_means_with_tsne(tsne_plot,ground_truth)
             k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,dims[i], ground_truth)
 
@@ -225,13 +229,12 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
             tsne_aligned_acc.append(tsne_acc)
             pca_aligned_acc.append(pca_acc)
 
-          dims = dims[:9]
           plot(dims,tsne_ari,pca_ari,tsne_aligned_acc,pca_aligned_acc, plot_title = 'Adjusted Rand Index (ARI) vs. Embedding Dimension for ' + dataset_name, x_label = 'Embedding Dimension', dim_label = 'tSNE')
 
        elif(compare_neighbors):
           #Note, this is the perplexity for tsne..
           for i in range(1,len(dims)):
-            tsne_plot = visualize_tsne(data,ground_truth,perplexity=dims[i],n_components=3)
+            tsne_plot = visualize_tsne(data,ground_truth,perp=dims[i],n_components=3)
             k_means_tsne_ari, k_means_tsne_labels = k_means_with_tsne(tsne_plot,ground_truth)
             k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,3, ground_truth)
 
