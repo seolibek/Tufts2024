@@ -82,7 +82,7 @@ def show_clusterable_embedding(hsi_data, ground_truth):
 
 
 
-def draw_umap(data_reshaped, ground_truth, n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean', title=''):
+def visualize_umap(data_reshaped, ground_truth, n_neighbors=15, min_dist=0.1, n_components=2, metric='euclidean', title=''):
     fit = umap.UMAP(
         n_neighbors=n_neighbors,
         min_dist=min_dist,
@@ -159,10 +159,9 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
     pca_aligned_acc = []
     dims = [1,2,3,4,5,6,10,30,50,100,150,200]
     if (compare_dim):
-      plt.title('Adjusted Rand Index (ARI) vs. Embedding Dimension for ' + dataset_name)
       #Neighbors at 30 for default val
       for i in range(len(dims) - 3):
-        d_plot = draw_umap(data, ground_truth, n_neighbors = 30, n_components = dims[i])
+        d_plot = visualize_umap(data, ground_truth, n_neighbors = 30, n_components = dims[i])
         k_means_umap_ari, k_means_umap_labels = k_means_with_umap(d_plot,ground_truth)
         k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,dims[i], ground_truth)
 
@@ -175,38 +174,54 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
         umap_aligned_acc.append(umap_acc)
         pca_aligned_acc.append(pca_acc)
 
-        dims = dims[:9]
-        plt.xlabel('Embedding Dimension')
+      dims = dims[:9]
+      plt.title('Adjusted Rand Index (ARI) vs. Embedding Dimension for ' + dataset_name)
+      plt.xlabel('Embedding Dimension')
+
+      plt.figure(figsize=(12, 5))
+      plt.subplot(1, 2, 1)
+      plt.plot(dims, umap_ari, label='UMAP ARI', marker='o')
+      plt.plot(dims, pca_ari, label='PCA ARI', marker='o')
+
+      plt.ylabel('ARI')
+      plt.legend()
+
+      plt.subplot(1, 2, 2)
+      plt.plot(dims, umap_aligned_acc, label='UMAP Accuracy', marker='o')
+      plt.plot(dims, pca_aligned_acc, label='PCA Accuracy', marker='o')
+      plt.ylabel('Accuracy')
+      plt.legend()
+      plt.tight_layout()
+      plt.show()
     elif (compare_neighbors):
-        for i in range(len(dims)):
-            d_plot = draw_umap(data,ground_truth,n_neighbors=dims[i],n_components=3)
-            k_means_umap_ari, k_means_umap_labels = k_means_with_umap(d_plot,ground_truth)
-            k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,dims[i], ground_truth)
+        for i in range(1,len(dims)):
+          d_plot = visualize_umap(data,ground_truth,n_neighbors=dims[i],n_components=3)
+          k_means_umap_ari, k_means_umap_labels = k_means_with_umap(d_plot,ground_truth)
+          k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,3, ground_truth)
 
-            umap_ari.append(k_means_umap_ari)
-            pca_ari.append(k_means_pca_ari)
+          umap_ari.append(k_means_umap_ari)
+          pca_ari.append(k_means_pca_ari)
 
-            umap_acc = calculate_aligned_accuracy(ground_truth, k_means_umap_labels)
-            pca_acc = calculate_aligned_accuracy(ground_truth, k_means_pca_labels)
+          umap_acc = calculate_aligned_accuracy(ground_truth, k_means_umap_labels)
+          pca_acc = calculate_aligned_accuracy(ground_truth, k_means_pca_labels)
 
-            umap_aligned_acc.append(umap_acc)
-            pca_aligned_acc.append(pca_acc)
+          umap_aligned_acc.append(umap_acc)
+          pca_aligned_acc.append(pca_acc)
+        dims = dims[1:]
+      plt.title('Adjusted Rand Index (ARI) vs. Number of Neighbors')
+      plt.xlabel('Number of Neighbors')
+      plt.figure(figsize=(12, 5))
+      plt.subplot(1, 2, 1)
+      plt.plot(dims, umap_ari, label='UMAP ARI', marker='o')
+      plt.plot(dims, pca_ari, label='PCA ARI', marker='o')
 
-        plt.title('Adjusted Rand Index (ARI) vs. Number of Neighbors')
-        plt.xlabel('Number of Neighbors')
+      plt.ylabel('ARI')
+      plt.legend()
 
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 2, 1)
-    plt.plot(dims, umap_ari, label='UMAP ARI', marker='o')
-    plt.plot(dims, pca_ari, label='PCA ARI', marker='o')
-
-    plt.ylabel('ARI')
-    plt.legend()
-
-    plt.subplot(1, 2, 2)
-    plt.plot(dims, umap_aligned_acc, label='UMAP Accuracy', marker='o')
-    plt.plot(dims, pca_aligned_acc, label='PCA Accuracy', marker='o')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+      plt.subplot(1, 2, 2)
+      plt.plot(dims, umap_aligned_acc, label='UMAP Accuracy', marker='o')
+      plt.plot(dims, pca_aligned_acc, label='PCA Accuracy', marker='o')
+      plt.ylabel('Accuracy')
+      plt.legend()
+      plt.tight_layout()
+      plt.show()
