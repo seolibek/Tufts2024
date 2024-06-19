@@ -91,42 +91,15 @@ def visualize_umap(data_reshaped, ground_truth, n_neighbors=15, min_dist=0.1, n_
         metric=metric
     )
     u = fit.fit_transform(data_reshaped)
-    fig = plt.figure()
-
-        #make this separate
-    # if n_components == 3:
-    #     ax = fig.add_subplot(111, projection='3d')
-    #     ax.scatter(u[:,0], u[:,1], u[:,2], c=ground_truth, s=4)
-    #     plt.title(title, fontsize=18)
-    #     def update(frame):
-    #         ax.view_init(elev=10, azim=frame)
-    #         return fig,
-    #     ani = FuncAnimation(fig, update, frames=range(0, 360, 2), blit=True)
-
-    #     plt.show()
-    #     ani.save('umap_rotation.mp4', writer='ffmpeg', fps=30)
+    rotation_3d(u = u, n_components=n_components,ground_truth=ground_truth,title=title)
     return u
-
-def visualize_tsne(data_reshaped, ground_truth, perp, n_components, title = ''):
-
-  
-  tsne = TSNE(n_components=n_components, perplexity=perp, learning_rate='auto', init='random', random_state=42)
-  u = tsne.fit_transform(data_reshaped)
-  # ax.scatter(u[:,0], u[:,1], u[:,2], c=ground_truth, s=4)
-  # title = ''
-  plt.title(title, fontsize=18)
-  # def update(frame):
-  #     ax.view_init(elev=10, azim=frame)
-  #     return fig,
-  # ani = FuncAnimation(fig, update, frames=range(0, 360, 2), blit=True)
-
-  return u
 
 
 def k_means_with_umap(dim_reduced_data, ground_truth):
 
   GT_flat = ground_truth.flatten()
   num_clusters = len(np.unique(GT_flat))
+
 
   # num_clusters = len(np.unique(GT_flat)) - (1 if 0 in GT_flat else 0)  # Adjust based on whether '0' should be excluded
   kmeans = KMeans(n_clusters=num_clusters, random_state=42)
@@ -136,21 +109,6 @@ def k_means_with_umap(dim_reduced_data, ground_truth):
   print("UMAP Adjusted Rand Index (ARI):", ari)
   return ari, labels
 
-def k_means_with_tsne(dim_reduced_data, ground_truth):
-
-  GT_flat = ground_truth.flatten()
-  num_clusters = len(np.unique(GT_flat))
-
-  # Perform KMeans clustering
-  kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-  labels = kmeans.fit_predict(dim_reduced_data)
-
-  # Calculate Adjusted Rand Index (ARI)
-  ari = adjusted_rand_score(GT_flat, labels)
-  print("t-SNE Adjusted Rand Index (ARI):", ari)
-
-  return ari, labels
-     
 
 def k_means_with_pca(data,n_components, ground_truth):
   GT_flat_PCA = ground_truth.flatten()
@@ -165,8 +123,6 @@ def k_means_with_pca(data,n_components, ground_truth):
   ari = adjusted_rand_score(GT_flat_PCA, labels)
   print("PCA Adjusted Rand Index (ARI):", ari)
   return ari, labels
-
-
 
 
 def calculate_aligned_accuracy(ground_truth, cluster_labels):
@@ -211,51 +167,12 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
     pca_ari = []
     pca_aligned_acc = []
     dims = [1,2,3,4,5,6,10,30,50,100,150,200]
-    if(tSNE):
-       if (compare_dim):
-          dims = [1,2,3,4]
-          for i in range(len(dims)):
-
-            tsne_plot = visualize_tsne(data,ground_truth, perp=30,n_components = dims[i])
-            k_means_tsne_ari, k_means_tsne_labels = k_means_with_tsne(tsne_plot,ground_truth)
-            k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,dims[i], ground_truth)
-
-            tsne_ari.append(k_means_tsne_ari)
-            pca_ari.append(k_means_pca_ari)
-
-            tsne_acc = calculate_aligned_accuracy(ground_truth, k_means_tsne_labels)
-            pca_acc = calculate_aligned_accuracy(ground_truth, k_means_pca_labels)
-
-            tsne_aligned_acc.append(tsne_acc)
-            pca_aligned_acc.append(pca_acc)
-
-          plot(dims,tsne_ari,pca_ari,tsne_aligned_acc,pca_aligned_acc, plot_title = 'Adjusted Rand Index (ARI) vs. Embedding Dimension for ' + dataset_name, x_label = 'Embedding Dimension', dim_label = 'tSNE')
-
-       elif(compare_neighbors):
-          #Note, this is the perplexity for tsne..
-          for i in range(1,len(dims)):
-            tsne_plot = visualize_tsne(data,ground_truth,perp=dims[i],n_components=3)
-            k_means_tsne_ari, k_means_tsne_labels = k_means_with_tsne(tsne_plot,ground_truth)
-            k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,3, ground_truth)
-
-            tsne_ari.append(k_means_tsne_ari)
-            pca_ari.append(k_means_pca_ari)
-
-            tsne_acc = calculate_aligned_accuracy(ground_truth, k_means_tsne_labels)
-            pca_acc = calculate_aligned_accuracy(ground_truth, k_means_pca_labels)
-
-            tsne_aligned_acc.append(tsne_acc)
-            pca_aligned_acc.append(pca_acc)
-          dims = dims[1:]
-          plot(dims,tsne_ari,pca_ari,tsne_aligned_acc,pca_aligned_acc, plot_title = 'Adjusted Rand Index (ARI) vs. Number of Neighbors for ' + dataset_name, x_label = 'Number of Neighbors', dim_label = 'tSNE')
-
-    else:
-      if (compare_dim):
-        #Neighbors at 30 for default val
-        for i in range(len(dims) - 3):
-          d_plot = visualize_umap(data, ground_truth, n_neighbors = 30, n_components = dims[i])
-          k_means_umap_ari, k_means_umap_labels = k_means_with_umap(d_plot,ground_truth)
-          k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,dims[i], ground_truth)
+    if (compare_dim):
+      #Neighbors at 30 for default val
+      for i in range(len(dims) - 3):
+        d_plot = visualize_umap(data, ground_truth, n_neighbors = 30, n_components = dims[i])
+        k_means_umap_ari, k_means_umap_labels = k_means_with_umap(d_plot,ground_truth)
+        k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,dims[i], ground_truth)
 
           umap_ari.append(k_means_umap_ari)
           pca_ari.append(k_means_pca_ari)
@@ -266,14 +183,30 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
           umap_aligned_acc.append(umap_acc)
           pca_aligned_acc.append(pca_acc)
 
-        dims = dims[:9]
-        plot(dims,umap_ari,pca_ari,umap_aligned_acc,pca_aligned_acc, plot_title = 'Adjusted Rand Index (ARI) vs. Embedding Dimension for ' + dataset_name, x_label = 'Embedding Dimension', dim_label = 'UMAP') 
+      dims = dims[:9]
+      plt.title('Adjusted Rand Index (ARI) vs. Embedding Dimension for ' + dataset_name)
+      plt.xlabel('Embedding Dimension')
 
-      elif (compare_neighbors):
-          for i in range(1,len(dims)):
-            d_plot = visualize_umap(data,ground_truth,n_neighbors=dims[i],n_components=3)
-            k_means_umap_ari, k_means_umap_labels = k_means_with_umap(d_plot,ground_truth)
-            k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,3, ground_truth)
+      plt.figure(figsize=(12, 5))
+      plt.subplot(1, 2, 1)
+      plt.plot(dims, umap_ari, label='UMAP ARI', marker='o')
+      plt.plot(dims, pca_ari, label='PCA ARI', marker='o')
+
+      plt.ylabel('ARI')
+      plt.legend()
+
+      plt.subplot(1, 2, 2)
+      plt.plot(dims, umap_aligned_acc, label='UMAP Accuracy', marker='o')
+      plt.plot(dims, pca_aligned_acc, label='PCA Accuracy', marker='o')
+      plt.ylabel('Accuracy')
+      plt.legend()
+      plt.tight_layout()
+      plt.show()
+    elif (compare_neighbors):
+        for i in range(1,len(dims)):
+          d_plot = visualize_umap(data,ground_truth,n_neighbors=dims[i],n_components=3)
+          k_means_umap_ari, k_means_umap_labels = k_means_with_umap(d_plot,ground_truth)
+          k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,3, ground_truth)
 
             umap_ari.append(k_means_umap_ari)
             pca_ari.append(k_means_pca_ari)
@@ -281,35 +214,23 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
             umap_acc = calculate_aligned_accuracy(ground_truth, k_means_umap_labels)
             pca_acc = calculate_aligned_accuracy(ground_truth, k_means_pca_labels)
 
-            umap_aligned_acc.append(umap_acc)
-            pca_aligned_acc.append(pca_acc)
-          dims = dims[1:]
-          plot(dims,umap_ari, pca_ari,umap_aligned_acc,pca_aligned_acc, plot_title = 'Adjusted Rand Index (ARI) vs. Number of Neighbors for' + dataset_name, x_label = 'Number of Neighbors', dim_label = 'UMAP')
+          umap_aligned_acc.append(umap_acc)
+          pca_aligned_acc.append(pca_acc)
+        dims = dims[1:]
+      plt.title('Adjusted Rand Index (ARI) vs. Number of Neighbors')
+      plt.xlabel('Number of Neighbors')
+      plt.figure(figsize=(12, 5))
+      plt.subplot(1, 2, 1)
+      plt.plot(dims, umap_ari, label='UMAP ARI', marker='o')
+      plt.plot(dims, pca_ari, label='PCA ARI', marker='o')
 
+      plt.ylabel('ARI')
+      plt.legend()
 
-def plot(dims,dim_ari, pca_ari, dim_acc, pca_acc, plot_title, x_label, dim_label):
-    plt.figure(figsize=(12, 5))
-    
-    plt.suptitle(plot_title)
-
-    # Plotting the ARI comparison
-    plt.subplot(1, 2, 1)  
-    plt.plot(dims, dim_ari, label= dim_label + ' ARI', marker='o')
-    plt.plot(dims, pca_ari, label='PCA ARI', marker='o')
-    plt.xlabel(x_label)
-    plt.ylabel('ARI')
-    plt.legend()
-
-    plt.subplot(1, 2, 2) 
-    plt.plot(dims, dim_acc, label= dim_label + ' Accuracy', marker='o')
-    plt.plot(dims, pca_acc, label='PCA Accuracy', marker='o')
-    plt.xlabel(x_label)
-    plt.ylabel('Accuracy')
-    plt.legend()
-
-    # Adjust layout to prevent overlap and ensure everything is visible
-    plt.tight_layout()
-    plt.show()
-
-
-
+      plt.subplot(1, 2, 2)
+      plt.plot(dims, umap_aligned_acc, label='UMAP Accuracy', marker='o')
+      plt.plot(dims, pca_aligned_acc, label='PCA Accuracy', marker='o')
+      plt.ylabel('Accuracy')
+      plt.legend()
+      plt.tight_layout()
+      plt.show()
