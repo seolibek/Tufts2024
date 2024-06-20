@@ -105,6 +105,7 @@ def rotation_3d(u, n_components, ground_truth, title):
           return fig,
       ani = FuncAnimation(fig, update, frames=range(0, 360, 2), blit=True)
       plt.show()
+      #potential issue in the line below, debug later..
       ani.save('umap_rotation.mp4', writer='ffmpeg', fps=30)
 
 def visualize_tsne(data_reshaped, ground_truth, perp, n_components, title = ''):
