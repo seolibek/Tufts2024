@@ -131,15 +131,20 @@ def k_means(ground_truth, dim_reduced_data = None, data = None, n_components=Non
 
   # num_clusters = len(np.unique(GT_flat)) - (1 if 0 in GT_flat else 0)  # Adjust based on whether '0' should be excluded
 
-  kmeans = KMeans(n_clusters=num_clusters, random_state=42)
   
   if method == "pca":
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+
     pca = PCA(n_components)
     data_reduced = pca.fit_transform(data)
     labels = kmeans.fit_predict(data_reduced)
   elif method == "umap":
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+
     labels = kmeans.fit_predict(dim_reduced_data)
   elif method == "tsne":
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+
     labels = kmeans.fit_predict(dim_reduced_data)
   
   ari = adjusted_rand_score(GT_flat, labels)
