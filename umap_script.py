@@ -91,21 +91,21 @@ def visualize_umap(data_reshaped, ground_truth, n_neighbors=15, min_dist=0.1, n_
         metric=metric
     )
     u = fit.fit_transform(data_reshaped)
-    rotation_3d(u = u, n_components=n_components,ground_truth=ground_truth,title=title)
-    return u
+    fig = plt.figure()
 
-def rotation_3d(u, n_components, ground_truth, title):
-  fig = plt.figure()
-  if n_components == 3:
-      ax = fig.add_subplot(111, projection='3d')
-      ax.scatter(u[:,0], u[:,1], u[:,2], c=ground_truth, s=4)
-      plt.title(title, fontsize=18)
-      def update(frame):
-          ax.view_init(elev=10, azim=frame)
-          return fig,
-      ani = FuncAnimation(fig, update, frames=range(0, 360, 2), blit=True)
-      plt.show()
-      ani.save('umap_rotation.mp4', writer='ffmpeg', fps=30)
+        #make this separate
+    # if n_components == 3:
+    #     ax = fig.add_subplot(111, projection='3d')
+    #     ax.scatter(u[:,0], u[:,1], u[:,2], c=ground_truth, s=4)
+    #     plt.title(title, fontsize=18)
+    #     def update(frame):
+    #         ax.view_init(elev=10, azim=frame)
+    #         return fig,
+    #     ani = FuncAnimation(fig, update, frames=range(0, 360, 2), blit=True)
+
+    #     plt.show()
+    #     ani.save('umap_rotation.mp4', writer='ffmpeg', fps=30)
+    return u
 
 def visualize_tsne(data_reshaped, ground_truth, perp, n_components, title = ''):
 
@@ -123,25 +123,59 @@ def visualize_tsne(data_reshaped, ground_truth, perp, n_components, title = ''):
   return u
 
 
-def k_means(dim_reduced_data = '',data = '', ground_truth = '', n_components=None, method='umap'):
-    GT_flat = ground_truth.flatten()
-    num_clusters = len(np.unique(GT_flat))
+def k_means(ground_truth, dim_reduced_data = None, data = None, n_components=None, method='None'):
 
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-    
-    if method == "pca":
-      pca = PCA(n_components)
-      data_reduced = pca.fit_transform(data)
-      labels = kmeans.fit_predict(data_reduced)
-    elif method == "umap":
-      labels = kmeans.fit_predict(dim_reduced_data)
-    elif method == "tsne":
-      labels = kmeans.fit_predict(dim_reduced_data)
-    
-    ari = adjusted_rand_score(GT_flat, labels)
-    print(f"{method} Adjusted Rand Index (ARI):", ari)
-    return ari, labels
-    
+
+  GT_flat = ground_truth.flatten()
+  num_clusters = len(np.unique(GT_flat))
+
+  # num_clusters = len(np.unique(GT_flat)) - (1 if 0 in GT_flat else 0)  # Adjust based on whether '0' should be excluded
+
+  kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+  
+  if method == "pca":
+    pca = PCA(n_components)
+    data_reduced = pca.fit_transform(data)
+    labels = kmeans.fit_predict(data_reduced)
+  elif method == "umap":
+    labels = kmeans.fit_predict(dim_reduced_data)
+  elif method == "tsne":
+    labels = kmeans.fit_predict(dim_reduced_data)
+  
+  ari = adjusted_rand_score(GT_flat, labels)
+  
+  print(f"{method} Adjusted Rand Index (ARI):", ari)
+  return ari, labels
+
+def k_means_with_tsne(dim_reduced_data, ground_truth):
+
+  GT_flat = ground_truth.flatten()
+  num_clusters = len(np.unique(GT_flat))
+
+  # Perform KMeans clustering
+  kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+  labels = kmeans.fit_predict(dim_reduced_data)
+
+  # Calculate Adjusted Rand Index (ARI)
+  ari = adjusted_rand_score(GT_flat, labels)
+  print("t-SNE Adjusted Rand Index (ARI):", ari)
+
+  return ari, labels
+     
+
+def k_means_with_pca(data,n_components, ground_truth):
+  GT_flat_PCA = ground_truth.flatten()
+
+  pca = PCA(n_components)
+  data_reduced = pca.fit_transform(data)
+
+  num_clusters = len(np.unique(GT_flat_PCA))
+  kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+  labels = kmeans.fit_predict(data_reduced)
+
+  ari = adjusted_rand_score(GT_flat_PCA, labels)
+  print("PCA Adjusted Rand Index (ARI):", ari)
+  return ari, labels
 
 
 
@@ -194,8 +228,12 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
           for i in range(len(dims)):
 
             tsne_plot = visualize_tsne(data,ground_truth, perp=30,n_components = dims[i])
-            k_means_tsne_ari, k_means_tsne_labels = k_means(tsne_plot,ground_truth,method = "tsne")
-            k_means_pca_ari, k_means_pca_labels = k_means(data,dims[i], ground_truth, method = "pca")
+
+            k_means_tsne_ari, k_means_tsne_labels = k_means_with_tsne(tsne_plot,ground_truth)
+            k_means_pca_ari, k_means_pca_labels = k_means_with_pca(data,dims[i], ground_truth)
+          
+            k_means_tsne_ari, k_means_tsne_labels = k_means(ground_truth,dim_reduced_data = tsne_plot, n_components = dims[i], method = "tsne")
+            k_means_pca_ari, k_means_pca_labels = k_means(ground_truth, data = data, n_components= dims[i], method = "pca")
 
             tsne_ari.append(k_means_tsne_ari)
             pca_ari.append(k_means_pca_ari)
@@ -212,8 +250,9 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
           #Note, this is the perplexity for tsne..
           for i in range(1,len(dims)):
             tsne_plot = visualize_tsne(data,ground_truth,perp=dims[i],n_components=3)
-            k_means_tsne_ari, k_means_tsne_labels = k_means(tsne_plot,ground_truth, method = "tsne")
-            k_means_pca_ari, k_means_pca_labels = k_means(data,3, ground_truth, method = "pca")
+
+            k_means_tsne_ari, k_means_tsne_labels = k_means(ground_truth, dim_reduced_data = tsne_plot, n_components = 3,method = "tsne")
+            k_means_pca_ari, k_means_pca_labels = k_means(ground_truth, data=data, n_components=3, method = "pca")
 
             tsne_ari.append(k_means_tsne_ari)
             pca_ari.append(k_means_pca_ari)
@@ -230,9 +269,10 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
       if (compare_dim):
         #Neighbors at 30 for default val
         for i in range(len(dims) - 3):
-          d_plot = visualize_umap(data, ground_truth, n_neighbors = 30, n_components = dims[i])
-          k_means_umap_ari, k_means_umap_labels = k_means(d_plot,ground_truth)
-          k_means_pca_ari, k_means_pca_labels = k_means(data,dims[i], ground_truth, method = "pca")
+
+          umap_plot = visualize_umap(data, ground_truth, n_neighbors = 30, n_components = dims[i])
+          k_means_umap_ari, k_means_umap_labels = k_means(ground_truth,dim_reduced_data = umap_plot, n_components = dims[i], method = "umap")
+          k_means_pca_ari, k_means_pca_labels = k_means(ground_truth, data = data, n_components= dims[i], method = "pca")
 
           umap_ari.append(k_means_umap_ari)
           pca_ari.append(k_means_pca_ari)
@@ -247,10 +287,10 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
         plot(dims,umap_ari,pca_ari,umap_aligned_acc,pca_aligned_acc, plot_title = 'Adjusted Rand Index (ARI) vs. Embedding Dimension for ' + dataset_name, x_label = 'Embedding Dimension', dim_label = 'UMAP') 
 
       elif (compare_neighbors):
-          for i in range(1,len(dims)):
-            d_plot = visualize_umap(data,ground_truth,n_neighbors=dims[i],n_components=3)
-            k_means_umap_ari, k_means_umap_labels = k_means(d_plot,ground_truth)
-            k_means_pca_ari, k_means_pca_labels = k_means(data,3, ground_truth, method = "pca")
+          for i in range(1,len(dims)):            
+            umap_plot = visualize_umap(data,ground_truth,n_neighbors=dims[i],n_components=3)
+            k_means_umap_ari, k_means_umap_labels = k_means(ground_truth,dim_reduced_data = umap_plot, n_components = dims[i], method = "umap")
+            k_means_pca_ari, k_means_pca_labels = k_means(ground_truth, data = data, n_components= 3, method = "pca")
 
             umap_ari.append(k_means_umap_ari)
             pca_ari.append(k_means_pca_ari)
@@ -287,5 +327,6 @@ def plot(dims,dim_ari, pca_ari, dim_acc, pca_acc, plot_title, x_label, dim_label
     # Adjust layout to prevent overlap and ensure everything is visible
     plt.tight_layout()
     plt.show()
+
 
 
