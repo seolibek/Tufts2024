@@ -1,15 +1,17 @@
 import torch
 import torch.nn as nn
-from umap_script import loadHSI
+from utils import loadHSI
 from torchvision import transforms
 import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
 
+print("import complete")
 
 #currently adjusted to salinas A, size 83 x 86, 204 bands
 class Autoencoder(nn.Module):
     def __init__(self):
         super(Autoencoder, self).__init__()
+        print("autoencoder initialized")
         self.encoder = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),  # (B, 1, 64, 64) -> (B, 16, 32, 32)
             nn.ReLU(),
@@ -51,18 +53,19 @@ class ResizeAndToTensor:
 
             return band, gt
 class DataFormatter:
-        def __init__(self):
-            return None
-        def __call__(self,hsi,gt):
+        def __init__(self, hsi, gt):
+            self.hsi = hsi
+            self.gt = gt
+        def __call__(self):
             transform = ResizeAndToTensor(size=(64, 64))
-            HSI_transformed, GT_transformed = transform(hsi, gt)
+            HSI_transformed, GT_transformed = transform(self.hsi, self.gt)
 
             HSI_transformed = []
             GT_transformed = []
 
-            for band_idx in range(hsi.shape[2]):  # looping over each spectral band, treating them like samples
-                band = hsi[:, :, band_idx]
-                band_t, gt_t = transform(band, gt)
+            for band_idx in range(self.hsi.shape[2]):  # looping over each spectral band, treating them like samples
+                band = self.hsi[:, :, band_idx]
+                band_t, gt_t = transform(band, self.gt)
                 HSI_transformed.append(band_t)
                 GT_transformed.append(gt_t)
 
@@ -85,8 +88,8 @@ def main():
     model = Autoencoder()
 
     #abstract out path later
-    salinasA_path = 'data/SalinasA_corrected.mat'
-    salinasA_gt_path = 'data/SalinasA_gt.mat'
+    salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
+    salinasA_gt_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_gt.mat'
     #and loadHSI stuff..
 
     X, M, N, D, HSI, GT, Y, n, K = loadHSI(salinasA_path, salinasA_gt_path, 'salinasA_corrected', 'salinasA_gt')
@@ -95,7 +98,8 @@ def main():
     #above, loaded data, where the data is HSI and ground truth is GT. then shape of the HSI data is 83 x 86 x 204 and GT is 83 x 86
     
     HSI = X.reshape((M, N, D)) 
-    train_loader,test_loader = DataFormatter(HSI,GT)
+    data = DataFormatter(HSI,GT)
+    train_loader,test_loader = data()
     
     # sanity check,.
     # for hsi_batch, gt_batch in train_loader:
@@ -127,3 +131,6 @@ def main():
                 print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {running_loss / 10:.4f}')
                 running_loss = 0.0
     torch.save(model.state_dict(), 'conv_autoencoder.pth')
+
+if __name__ == "__main__":
+    main()
