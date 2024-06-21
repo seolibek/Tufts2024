@@ -45,3 +45,6 @@ def loadHSI(data_path, ground_truth_path, data_col, ground_truth_col):
   GT = new_gt
 
   return X, M, N, D, HSI, GT, Y, n, K
+
+
+
