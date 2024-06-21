@@ -73,11 +73,12 @@ class DataFormatter:
             # Convert lists to tensors.. idk y but not doing this breaks training process later...
             HSI_transformed = torch.stack(HSI_transformed)
             GT_transformed = torch.stack(GT_transformed)
-
+            
+            #potential issue in the train_test_split...
             HSI_transformed = HSI_transformed.unsqueeze(1)  # reshaped for the num spectral bands (204, 1, 64, 64)
             HSI_transformed = HSI_transformed.squeeze(1)  
-            HSI_train, HSI_test, GT_train, GT_test = train_test_split(HSI_transformed, GT_transformed, test_size=0.2, random_state=42)
-
+            HSI_train, HSI_test, GT_train, GT_test = train_test_split(HSI_transformed, GT_transformed, random_state=42)
+            
             train_dataset = torch.utils.data.TensorDataset(HSI_train, GT_train)
             test_dataset = torch.utils.data.TensorDataset(HSI_test, GT_test)
 
@@ -115,36 +116,45 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     # Train the autoencoder
-    num_epochs = 30 #i just want it to stop training pretty fast, make it higher later
+    num_epochs = 30
+    print(len(train_loader))
 
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
+        
         for i, (hsi_batch, gt_batch) in enumerate(train_loader):
+            hsi_batch = hsi_batch.to(device)
+            gt_batch = gt_batch.to(device)
+
             optimizer.zero_grad()
             outputs = model(hsi_batch)
-            print(model.embedding(hsi_batch).shape)
-            print("only one")
             loss = mse(outputs, hsi_batch)  # Autoencoder reconstructs the input
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
-            if i % 10 == 9:  # Print every 10 batches
+            if (i + 1) % 10 == 0:  # Print every 10 batches
+                print("does this, ever happen")
                 print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {running_loss / 10:.4f}')
                 running_loss = 0.0
 
         # Validation after each epoch
+        model.eval()
+        total_loss = 0
         with torch.no_grad():
-            model.eval()
-            total_loss = 0
-            for hsi_batch, gt_batch in train_loader:
+            for hsi_batch, gt_batch in test_loader:
+                hsi_batch = hsi_batch.to(device)
+                gt_batch = gt_batch.to(device)
+
                 outputs = model(hsi_batch)
                 loss = mse(outputs, hsi_batch)
                 total_loss += loss.item()
-                # embeddings = 
-            print(f'Validation Loss after Epoch [{epoch + 1}/{num_epochs}]: {total_loss / len(train_loader):.4f}')
+
+        print(f'Validation Loss after Epoch [{epoch + 1}/{num_epochs}]: {total_loss / len(test_loader):.4f}')
 
     torch.save(model.state_dict(), 'conv_autoencoder.pth')
+
+
 if __name__ == "__main__":
     main()
