@@ -108,6 +108,7 @@ def rotation_3d(u, n_components, ground_truth, title):
       #potential issue in the line below, debug later..
       ani.save('umap_rotation.mp4', writer='ffmpeg', fps=30)
 
+
 def visualize_tsne(data_reshaped, ground_truth, perp, n_components, title = ''):
 
   
@@ -201,9 +202,9 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
 
             tsne_plot = visualize_tsne(data,ground_truth, perp=30,n_components = dims[i])
           
-            k_means_tsne_ari, k_means_tsne_labels = k_means(ground_truth,dim_reduced_data = tsne_plot, n_components = dims[i], method = "tSNE")
+            k_means_tsne_ari, k_means_tsne_labels = k_means(ground_truth,dim_reduced_data = tsne_plot, n_components = dims[i], method = "TSNE")
             k_means_pca_ari, k_means_pca_labels = k_means(ground_truth, data = data, n_components= dims[i], method = "PCA")
-
+            
             tsne_ari.append(k_means_tsne_ari)
             pca_ari.append(k_means_pca_ari)
 
@@ -220,7 +221,7 @@ def compare_umap(data, ground_truth, dataset_name, compare_dim, compare_neighbor
           for i in range(1,len(dims)):
             tsne_plot = visualize_tsne(data,ground_truth,perp=dims[i],n_components=3)
 
-            k_means_tsne_ari, k_means_tsne_labels = k_means(ground_truth, dim_reduced_data = tsne_plot, n_components = 3,method = "tSNE")
+            k_means_tsne_ari, k_means_tsne_labels = k_means(ground_truth, dim_reduced_data = tsne_plot, n_components = 3,method = "TSNE")
             k_means_pca_ari, k_means_pca_labels = k_means(ground_truth, data=data, n_components=3, method = "PCA")
 
             tsne_ari.append(k_means_tsne_ari)
@@ -295,6 +296,40 @@ def plot(dims,dim_ari, pca_ari, dim_acc, pca_acc, plot_title, x_label, dim_label
 
     plt.tight_layout()
     plt.show()
+
+def tsne_projection_2d(hsi_data, ground_truth, perplexity=30, random_state=42):
+  # Reshape the data to (n_samples, n_features)
+
+  # Initialize and fit t-SNE
+  tsne = TSNE(n_components=2, perplexity=perplexity, learning_rate='auto', init='random', random_state=random_state)
+  embedding = tsne.fit_transform(hsi_data)
+
+  # Visualization
+  plt.figure(figsize=(10, 8))
+  scatter = plt.scatter(embedding[:, 0], embedding[:, 1], c=ground_truth.ravel(), s=0.1, cmap='Spectral')
+  plt.title('2D t-SNE Projection of the Dataset')
+  plt.colorbar(scatter, label='Spectral classes')
+  plt.xlabel('t-SNE 1')
+  plt.ylabel('t-SNE 2')
+  plt.show()
+  
+
+def animation(HSI, GT):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    tsne = TSNE(n_components=3, perplexity=30, learning_rate='auto', init='random', random_state=42)
+    u = tsne.fit_transform(HSI)
+    ax.scatter(u[:,0], u[:,1], u[:,2], c=GT, s=4)
+    title = ''
+    plt.title(title, fontsize=18)
+    def update(frame):
+        ax.view_init(elev=10, azim=frame)
+        return fig,
+    ani = FuncAnimation(fig, update, frames=range(0, 360, 2), blit=True)
+
+    plt.show()
+    # line below has a bug
+    ani.save('umap_rotation.mp4', writer='ffmpeg', fps=30)
 
 
 
