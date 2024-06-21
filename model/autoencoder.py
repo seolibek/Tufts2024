@@ -7,6 +7,25 @@ from sklearn.model_selection import train_test_split
 
 print("import complete")
 
+
+#########################
+# TODO:
+
+# potentially fix dataformatter - i feel like this is slightly wrong, as it generates like singular samples, which messes up the training
+# loop, where the loop thinks that it should jsut stop at 1.
+
+# Strangely enough, not an issue with the validation step. strange.. needs to be looked at
+# self.embeddings returns both the encoded and decoded (reason unclear. fix.) Is it possible that the forward pass is being called?
+
+
+
+
+
+
+
+
+
+
 #currently adjusted to salinas A, size 83 x 86, 204 bands
 class Autoencoder(nn.Module):
     def __init__(self):
