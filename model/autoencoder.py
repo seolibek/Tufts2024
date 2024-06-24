@@ -60,7 +60,6 @@ class DataFormatter:
         def __call__(self):
             print('original sizes')
             print(self.hsi.shape)# (83,86,204)
-            # print(self.gt.shape) #(83,86)
             self.hsi_padded = adjust_image_dimensions(self.hsi)
 
             hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright = split_image_into_quadrants(self.hsi_padded)
@@ -71,8 +70,6 @@ class DataFormatter:
             train_dataset = torch.utils.data.ConcatDataset([train_dataset1, train_dataset2, train_dataset3])
 
             test_hsi = hsi_bottomright
-            # test_gt = gt_bottomright
-
             test_dataset = HSIDataset(test_hsi)
 
             train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
@@ -81,13 +78,11 @@ class DataFormatter:
             # Check batch shapes in DataLoader
             for hsi_batch in train_loader:
                 print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, H, W)
-                # print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
-                break  # Print only the first batch for verification
+                break  
 
             for hsi_batch in test_loader:
                 print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, H, W)
-                # print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
-                break  # Print only the first batch for verificatio
+                break 
             return train_loader,test_loader
         
         def padded_image(self):
@@ -103,14 +98,12 @@ class HSIDataset(Dataset):
             gt (numpy.ndarray): Ground truth data with shape (H, W).
         """
         self.hsi = torch.from_numpy(hsi).float()  # (H, W, C)
-        # self.gt = torch.from_numpy(gt).float()  # (H, W)
 
     def __len__(self):
         return self.hsi.shape[2]  # Number of spectral bands (C)
 
     def __getitem__(self, idx):
         band = self.hsi[:, :, idx].unsqueeze(0)  # (H, W) -> (1, H, W)
-        # gt = self.gt  # (H, W)
         return band
     
 def split_image_into_quadrants(hsi):
@@ -123,11 +116,6 @@ def split_image_into_quadrants(hsi):
     hsi_bottomleft = hsi[h_mid:, :w_mid, :]
     hsi_bottomright = hsi[h_mid:, w_mid:, :]
 
-    # gt_topleft = gt[:h_mid, :w_mid]
-    # gt_topright = gt[:h_mid, w_mid:]
-    # gt_bottomleft = gt[h_mid:, :w_mid]
-    # gt_bottomright = gt[h_mid:, w_mid:]
-
     return hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright
 
 def adjust_image_dimensions(hsi):
@@ -135,10 +123,7 @@ def adjust_image_dimensions(hsi):
     pad_h = (16 - H % 16) if H % 16 != 0 else 0
     pad_w = (16 - W % 16) if W % 16 != 0 else 0
     
-    # Pad the hyperspectral image
     hsi_padded = np.pad(hsi, ((0, pad_h), (0, pad_w), (0, 0)), mode='constant')
-    # Pad the ground truth
-    # gt_padded = np.pad(gt, ((0, pad_h), (0, pad_w)), mode='constant')
     
     return hsi_padded
     
@@ -201,7 +186,6 @@ def main():
         
         for i, (hsi_batch) in enumerate(train_loader):
             hsi_batch = hsi_batch.to(device)
-            # gt_batch = gt_batch.to(device)
 
             optimizer.zero_grad()
             outputs = model(hsi_batch)
@@ -219,8 +203,6 @@ def main():
         with torch.no_grad():
             for hsi_batch in test_loader:
                 hsi_batch = hsi_batch.to(device)
-                # gt_batch = gt_batch.to(device)
-
                 outputs = model(hsi_batch)
                 loss = mse(outputs, hsi_batch)
                 total_loss += loss.item()
