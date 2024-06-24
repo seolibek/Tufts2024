@@ -19,8 +19,6 @@ print("import complete")
 
 
 
-
-
 #currently adjusted to salinas A, size 83 x 86, 204 bands
 class Autoencoder(nn.Module):
     def __init__(self):
@@ -91,6 +89,7 @@ class DataFormatter:
                 print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
                 break  # Print only the first batch for verificatio
             return train_loader,test_loader
+        
         def padded_image(self):
             return self.hsi_padded,self.gt_padded
 
@@ -143,16 +142,27 @@ def adjust_image_dimensions(hsi, gt):
     
     return hsi_padded, gt_padded
     
-def get_full_image_encoding(model, hsi_padded):
-    #i should alraed y be in eval mode
+def encode_quadrant(model, quadrant):
+    model.eval()  
     with torch.no_grad():  
-        hsi_tensor = torch.from_numpy(hsi_padded).float().unsqueeze(0).permute(0, 3, 1, 2).to('cuda' if torch.cuda.is_available() else 'cpu')
+        quadrant_tensor = torch.from_numpy(quadrant).float().unsqueeze(0).permute(0, 3, 1, 2).to('cuda' if torch.cuda.is_available() else 'cpu')
+        encoded_quadrant = model.encoder(quadrant_tensor)
         
-        # Encode the entire image using the model
-        full_encoded_image = model.encoder(hsi_tensor)
-        
-    return full_encoded_image.cpu()
+    return encoded_quadrant.cpu()  
 
+def get_full_image_encoding(model, hsi_padded_full, gt_padded_full):
+    hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright = split_image_into_quadrants(hsi_padded_full,gt_padded_full)
+    
+    encoded_topleft = encode_quadrant(model, hsi_topleft)
+    encoded_topright = encode_quadrant(model, hsi_topright)
+    encoded_bottomleft = encode_quadrant(model, hsi_bottomleft)
+    encoded_bottomright = encode_quadrant(model, hsi_bottomright)
+    
+    encoded_top = torch.cat((encoded_topleft, encoded_topright), dim=3)
+    encoded_bottom = torch.cat((encoded_bottomleft, encoded_bottomright), dim=3)
+    full_encoded_image = torch.cat((encoded_top, encoded_bottom), dim=2)
+    
+    return full_encoded_image
 def main():
 
     model = Autoencoder()
@@ -214,8 +224,14 @@ def main():
                 total_loss += loss.item()
 
         print(f'Validation Loss after Epoch [{epoch + 1}/{num_epochs}]: {total_loss / len(test_loader):.4f}')
-    # full_image_encoding = get_full_image_encoding(model, hsi_padded)
-    # print("Full Image Encoding Shape:", full_image_encoding.shape)
+
+#here i should comine the pieces to make a full encoded image..
+    full_image_encoding = get_full_image_encoding(model,hsi_padded,gt_padded)
+    print("Full Image Encoding Shape:", full_image_encoding.shape)
+    save_path = 'encoded_full_image.pt'
+    torch.save(full_image_encoding, save_path)
+    print(f"Encoded representation saved to {save_path}")
+
     torch.save(model.state_dict(), 'conv_autoencoder.pth')
 
 
