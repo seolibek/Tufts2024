@@ -60,7 +60,7 @@ class DataFormatter:
         def __call__(self):
             print('original sizes')
             print(self.hsi.shape)# (83,86,204)
-            self.hsi_padded = adjust_image_dimensions(self.hsi)
+            self.hsi_padded, (self.padh, self.padw) = adjust_image_dimensions(self.hsi)
 
             hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright = split_image_into_quadrants(self.hsi_padded)
 
@@ -85,9 +85,8 @@ class DataFormatter:
                 break 
             return train_loader,test_loader
         
-        def padded_image(self):
-            return self.hsi_padded
-
+        def padding(self):
+            return self.hsi_padded, (self.padh, self.padw) 
 
 
 class HSIDataset(Dataset):
@@ -125,17 +124,18 @@ def adjust_image_dimensions(hsi):
     
     hsi_padded = np.pad(hsi, ((0, pad_h), (0, pad_w), (0, 0)), mode='constant')
     
-    return hsi_padded
+    return hsi_padded, (pad_h, pad_w)
     
 def encode_quadrant(model, quadrant):
     model.eval()  
-    with torch.no_grad():  
-        quadrant_tensor = torch.from_numpy(quadrant).float().unsqueeze(0).permute(0, 3, 1, 2).to('cuda' if torch.cuda.is_available() else 'cpu')
-        print(quadrant.shape)
-
-        encoded_quadrant = model.encoder(quadrant_tensor)
-        
-    return encoded_quadrant.cpu()  
+    with torch.no_grad():
+        encoded_bands = []
+        for idx in range(quadrant.shape[2]):
+            band = torch.from_numpy(quadrant[:, :, idx]).float().unsqueeze(0).unsqueeze(0)
+            encoded_band = model.encoder(band)
+            encoded_bands.append(encoded_band)
+        encoded_quadrant = torch.cat(encoded_bands, dim=1)
+    return encoded_quadrant
 
 def get_full_image_encoding(model, hsi_padded_full):
     hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright = split_image_into_quadrants(hsi_padded_full)
@@ -168,7 +168,6 @@ def main():
     data = DataFormatter(HSI)
 
     train_loader,test_loader = data()
-    hsi_padded = data.padded_image()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -209,14 +208,23 @@ def main():
 
         print(f'Validation Loss after Epoch [{epoch + 1}/{num_epochs}]: {total_loss / len(test_loader):.4f}')
 
-#here i should comine the pieces to make a full encoded image..
-    # full_image_encoding = get_full_image_encoding(model,hsi_padded,gt_padded)
-    # print("Full Image Encoding Shape:", full_image_encoding.shape)
-    # save_path = 'encoded_full_image.pt'
-    # torch.save(full_image_encoding, save_path)
-    # print(f"Encoded representation saved to {save_path}")
+# #here i should comine the pieces to make a full encoded image..
+# #main issue - the padding. Due to padding, when i am adding images tog, it does not correctly combine them (influenced by the 0s)
+#     hsi_padded, padding = adjust_image_dimensions(HSI)
+#     full_encoded_image = get_full_image_encoding(model, hsi_padded)#error message: RuntimeError: Given groups=1, weight of size [16, 1, 3, 3], expected input[1, 204, 48, 48] to have 1 channels, but got 204 channels instead
 
-    torch.save(model.state_dict(), 'conv_autoencoder.pth')
+#     original_h, original_w, _ = HSI.shape
+#     hsi_padded, (pad_h, pad_w) = data.padding()
+
+#     if pad_h > 0 or pad_w > 0:
+#         full_encoded_image = full_encoded_image[:, :, :original_h//16, :original_w//16]
+
+#     print("Full Image Encoding Shape:", full_encoded_image.shape) #lol why is the size [1, 26112, 5 5]
+#     save_path = 'full_encoded_image.pt'
+#     torch.save(full_encoded_image, save_path)
+#     print(f"Encoded representation saved to {save_path}")
+
+#     torch.save(model.state_dict(), 'conv_autoencoder.pth')
 
 
 if __name__ == "__main__":
