@@ -42,7 +42,7 @@ class Autoencoder(nn.Module):
             nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 32, H/4, W/4) -> (B, 16, H/2, W/2)
             nn.ReLU(),
             nn.ConvTranspose2d(16, 1, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 16, H/2, W/2) -> (B, 1, H, W)
-            nn.Sigmoid()  # Using Sigmoid to get outputs between 0 and 1
+            nn.Sigmoid()  
         )
 
     def forward(self, x):
@@ -53,67 +53,67 @@ class Autoencoder(nn.Module):
         return self.encoded
 
 class DataFormatter:
-        def __init__(self, hsi, gt):
+        def __init__(self, hsi):
             self.hsi = hsi
-            self.gt = gt
+            # self.gt = gt
 
         def __call__(self):
             print('original sizes')
             print(self.hsi.shape)# (83,86,204)
-            print(self.gt.shape) #(83,86)
-            self.hsi_padded, self.gt_padded = adjust_image_dimensions(self.hsi, self.gt)
+            # print(self.gt.shape) #(83,86)
+            self.hsi_padded = adjust_image_dimensions(self.hsi)
 
-            (hsi_topleft, gt_topleft), (hsi_topright, gt_topright), (hsi_bottomleft, gt_bottomleft), (hsi_bottomright, gt_bottomright) = split_image_into_quadrants(self.hsi_padded, self.gt_padded)
+            hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright = split_image_into_quadrants(self.hsi_padded)
 
-            train_hsi = np.concatenate([hsi_topleft, hsi_topright, hsi_bottomleft], axis=2)
-            train_gt = np.concatenate([gt_topleft, gt_topright, gt_bottomleft], axis=0)  # Ground truth should match the combined height
+            train_dataset1 = HSIDataset(hsi_topleft)
+            train_dataset2 = HSIDataset(hsi_topright)
+            train_dataset3 = HSIDataset(hsi_bottomleft)
+            train_dataset = torch.utils.data.ConcatDataset([train_dataset1, train_dataset2, train_dataset3])
 
-            # Use one quadrant for testing
             test_hsi = hsi_bottomright
-            test_gt = gt_bottomright
+            # test_gt = gt_bottomright
 
-            train_dataset = HSIDataset(train_hsi, train_gt)
-            test_dataset = HSIDataset(test_hsi, test_gt)
+            test_dataset = HSIDataset(test_hsi)
 
             train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
             test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
             # Check batch shapes in DataLoader
-            for hsi_batch, gt_batch in train_loader:
+            for hsi_batch in train_loader:
                 print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, H, W)
-                print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
+                # print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
                 break  # Print only the first batch for verification
 
-            for hsi_batch, gt_batch in test_loader:
+            for hsi_batch in test_loader:
                 print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, H, W)
-                print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
+                # print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
                 break  # Print only the first batch for verificatio
             return train_loader,test_loader
         
         def padded_image(self):
-            return self.hsi_padded,self.gt_padded
+            return self.hsi_padded
 
 
 
 class HSIDataset(Dataset):
-    def __init__(self, hsi, gt):
+    def __init__(self, hsi):
         """
         Args:
             hsi (numpy.ndarray): Hyperspectral image data with shape (H, W, C).
             gt (numpy.ndarray): Ground truth data with shape (H, W).
         """
         self.hsi = torch.from_numpy(hsi).float()  # (H, W, C)
-        self.gt = torch.from_numpy(gt).float()  # (H, W)
+        # self.gt = torch.from_numpy(gt).float()  # (H, W)
 
     def __len__(self):
         return self.hsi.shape[2]  # Number of spectral bands (C)
 
     def __getitem__(self, idx):
         band = self.hsi[:, :, idx].unsqueeze(0)  # (H, W) -> (1, H, W)
-        gt = self.gt  # (H, W)
-        return band, gt
+        # gt = self.gt  # (H, W)
+        return band
     
-def split_image_into_quadrants(hsi, gt):
+def split_image_into_quadrants(hsi):
     H, W, _ = hsi.shape
     h_mid = H // 2
     w_mid = W // 2
@@ -123,14 +123,14 @@ def split_image_into_quadrants(hsi, gt):
     hsi_bottomleft = hsi[h_mid:, :w_mid, :]
     hsi_bottomright = hsi[h_mid:, w_mid:, :]
 
-    gt_topleft = gt[:h_mid, :w_mid]
-    gt_topright = gt[:h_mid, w_mid:]
-    gt_bottomleft = gt[h_mid:, :w_mid]
-    gt_bottomright = gt[h_mid:, w_mid:]
+    # gt_topleft = gt[:h_mid, :w_mid]
+    # gt_topright = gt[:h_mid, w_mid:]
+    # gt_bottomleft = gt[h_mid:, :w_mid]
+    # gt_bottomright = gt[h_mid:, w_mid:]
 
-    return (hsi_topleft, gt_topleft), (hsi_topright, gt_topright), (hsi_bottomleft, gt_bottomleft), (hsi_bottomright, gt_bottomright)
+    return hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright
 
-def adjust_image_dimensions(hsi, gt):
+def adjust_image_dimensions(hsi):
     H, W, C = hsi.shape
     pad_h = (16 - H % 16) if H % 16 != 0 else 0
     pad_w = (16 - W % 16) if W % 16 != 0 else 0
@@ -138,20 +138,22 @@ def adjust_image_dimensions(hsi, gt):
     # Pad the hyperspectral image
     hsi_padded = np.pad(hsi, ((0, pad_h), (0, pad_w), (0, 0)), mode='constant')
     # Pad the ground truth
-    gt_padded = np.pad(gt, ((0, pad_h), (0, pad_w)), mode='constant')
+    # gt_padded = np.pad(gt, ((0, pad_h), (0, pad_w)), mode='constant')
     
-    return hsi_padded, gt_padded
+    return hsi_padded
     
 def encode_quadrant(model, quadrant):
     model.eval()  
     with torch.no_grad():  
         quadrant_tensor = torch.from_numpy(quadrant).float().unsqueeze(0).permute(0, 3, 1, 2).to('cuda' if torch.cuda.is_available() else 'cpu')
+        print(quadrant.shape)
+
         encoded_quadrant = model.encoder(quadrant_tensor)
         
     return encoded_quadrant.cpu()  
 
-def get_full_image_encoding(model, hsi_padded_full, gt_padded_full):
-    hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright = split_image_into_quadrants(hsi_padded_full,gt_padded_full)
+def get_full_image_encoding(model, hsi_padded_full):
+    hsi_topleft, hsi_topright, hsi_bottomleft, hsi_bottomright = split_image_into_quadrants(hsi_padded_full)
     
     encoded_topleft = encode_quadrant(model, hsi_topleft)
     encoded_topright = encode_quadrant(model, hsi_topright)
@@ -178,10 +180,10 @@ def main():
     #above, loaded data, where the data is HSI and ground truth is GT. then shape of the HSI data is 83 x 86 x 204 and GT is 83 x 86
     
     HSI = X.reshape((M, N, D)) 
-    data = DataFormatter(HSI,GT)
+    data = DataFormatter(HSI)
 
     train_loader,test_loader = data()
-    hsi_padded, gt_padded = data.padded_image()
+    hsi_padded = data.padded_image()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -197,27 +199,27 @@ def main():
         model.train()
         running_loss = 0.0
         
-        for i, (hsi_batch, gt_batch) in enumerate(train_loader):
+        for i, (hsi_batch) in enumerate(train_loader):
             hsi_batch = hsi_batch.to(device)
-            gt_batch = gt_batch.to(device)
+            # gt_batch = gt_batch.to(device)
 
             optimizer.zero_grad()
             outputs = model(hsi_batch)
-            loss = mse(outputs, hsi_batch)  # Autoencoder reconstructs the input
+            loss = mse(outputs, hsi_batch)  
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
-            if (i + 1) % 10 == 0:  # Print every 10 batches
+            if (i + 1) % 10 == 0:  
                 print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {running_loss / 10:.4f}')
                 running_loss = 0.0
 
         model.eval()
         total_loss = 0
         with torch.no_grad():
-            for hsi_batch, gt_batch in test_loader:
+            for hsi_batch in test_loader:
                 hsi_batch = hsi_batch.to(device)
-                gt_batch = gt_batch.to(device)
+                # gt_batch = gt_batch.to(device)
 
                 outputs = model(hsi_batch)
                 loss = mse(outputs, hsi_batch)
@@ -226,11 +228,11 @@ def main():
         print(f'Validation Loss after Epoch [{epoch + 1}/{num_epochs}]: {total_loss / len(test_loader):.4f}')
 
 #here i should comine the pieces to make a full encoded image..
-    full_image_encoding = get_full_image_encoding(model,hsi_padded,gt_padded)
-    print("Full Image Encoding Shape:", full_image_encoding.shape)
-    save_path = 'encoded_full_image.pt'
-    torch.save(full_image_encoding, save_path)
-    print(f"Encoded representation saved to {save_path}")
+    # full_image_encoding = get_full_image_encoding(model,hsi_padded,gt_padded)
+    # print("Full Image Encoding Shape:", full_image_encoding.shape)
+    # save_path = 'encoded_full_image.pt'
+    # torch.save(full_image_encoding, save_path)
+    # print(f"Encoded representation saved to {save_path}")
 
     torch.save(model.state_dict(), 'conv_autoencoder.pth')
 
