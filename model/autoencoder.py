@@ -4,23 +4,18 @@ from utils import loadHSI
 from torchvision import transforms
 import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
-
+from torch.utils.data import DataLoader, Dataset
+import numpy as np
 print("import complete")
 
 
 #########################
 # TODO:
 
-# potentially fix dataformatter - i feel like this is slightly wrong, as it generates like singular samples, which messes up the training
-# loop, where the loop thinks that it should jsut stop at 1.
-
-# Strangely enough, not an issue with the validation step. strange.. needs to be looked at
-# self.embeddings returns both the encoded and decoded (reason unclear. fix.) Is it possible that the forward pass is being called?
-
-
-
-
-
+# hsi is a single hyperspectral image with shape (h,w,c), where c represents number of spectral bands. and ground truth is the ground truth clustering
+#  representation in (h,w) shape. I want to think of the 'c' as the number of samples, but because I am looking at the same photo and want to prevent 
+# data leaks, I want to split up the original image into fourths, use 3/4 of it for training, and 1/4 for testing. So in my training step, each epoch 
+# should still have 204 channels * 3 = 612 samples, and the testing step should have 204 samples. 
 
 
 
@@ -32,81 +27,134 @@ class Autoencoder(nn.Module):
         super(Autoencoder, self).__init__()
         print("autoencoder initialized")
         self.encoder = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),  # (B, 1, 64, 64) -> (B, 16, 32, 32)
+            nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),  # (B, 1, H, W) -> (B, 16, H/2, W/2)
             nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),  # (B, 16, 32, 32) -> (B, 32, 16, 16)
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),  # (B, 16, H/2, W/2) -> (B, 32, H/4, W/4)
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),  # (B, 32, 16, 16) -> (B, 64, 8, 8)
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),  # (B, 32, H/4, W/4) -> (B, 64, H/8, W/8)
+            nn.ReLU(),
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),  # (B, 64, H/8, W/8) -> (B, 128, H/16, W/16)
             nn.ReLU(),
         )
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 64, 8, 8) -> (B, 32, 16, 16)
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 128, H/16, W/16) -> (B, 64, H/8, W/8)
             nn.ReLU(),
-            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 32, 16, 16) -> (B, 16, 32, 32)
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 64, H/8, W/8) -> (B, 32, H/4, W/4)
             nn.ReLU(),
-            nn.ConvTranspose2d(16, 1, kernel_size=3, stride=2, padding=1, output_padding=1),   # (B, 16, 32, 32) -> (B, 1, 64, 64)
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 32, H/4, W/4) -> (B, 16, H/2, W/2)
+            nn.ReLU(),
+            nn.ConvTranspose2d(16, 1, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 16, H/2, W/2) -> (B, 1, H, W)
             nn.Sigmoid()  # Using Sigmoid to get outputs between 0 and 1
         )
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
+        self.encoded = self.encoder(x)
+        x = self.decoder(self.encoded)
         return x
-    def embedding(self,x):
-        return self.encoder(x)
-    
-class ResizeAndToTensor:
-        def __init__(self, size):
-            self.size = size
+    def embedding(self):
+        return self.encoded
 
-        def __call__(self, band, gt):
-
-            band = torch.from_numpy(band).float()  
-            gt = torch.from_numpy(gt).float()      
-
-            band = band.unsqueeze(0).unsqueeze(0) #(83, 86) -> (1, 1, 83, 86)
-            band = F.interpolate(band, size=self.size, mode='bilinear', align_corners=False) #(1, 1, 83, 86) -> (1, 1, 64, 64)
-            band = band.squeeze(0) #(1, 1, 64, 64) -> (1, 64, 64) squeeze only once - keeping 1 for the channel dims, which  isnt needed for gt
-
-            gt = gt.unsqueeze(0).unsqueeze(0)
-            gt = F.interpolate(gt, size=self.size, mode='nearest')
-            gt = gt.squeeze(0).squeeze(0) #(1, 1, 64, 64) -> (64, 64)
-
-            return band, gt
 class DataFormatter:
         def __init__(self, hsi, gt):
             self.hsi = hsi
             self.gt = gt
+
         def __call__(self):
-            transform = ResizeAndToTensor(size=(64, 64))
-            
-            HSI_transformed = []
-            GT_transformed = []
+            print('original sizes')
+            print(self.hsi.shape)# (83,86,204)
+            print(self.gt.shape) #(83,86)
+            self.hsi_padded, self.gt_padded = adjust_image_dimensions(self.hsi, self.gt)
 
-            for band_idx in range(self.hsi.shape[2]):  # looping over each spectral band, treating them like samples
-                band = self.hsi[:, :, band_idx]
-                band_t, gt_t = transform(band, self.gt)
-                HSI_transformed.append(band_t)
-                GT_transformed.append(gt_t)
+            (hsi_topleft, gt_topleft), (hsi_topright, gt_topright), (hsi_bottomleft, gt_bottomleft), (hsi_bottomright, gt_bottomright) = split_image_into_quadrants(self.hsi_padded, self.gt_padded)
 
-            # Convert lists to tensors.. idk y but not doing this breaks training process later...
-            HSI_transformed = torch.stack(HSI_transformed)
-            GT_transformed = torch.stack(GT_transformed)
-            
-            #potential issue in the train_test_split...
-            HSI_transformed = HSI_transformed.unsqueeze(1)  # reshaped for the num spectral bands (204, 1, 64, 64)
-            HSI_transformed = HSI_transformed.squeeze(1)  
-            HSI_train, HSI_test, GT_train, GT_test = train_test_split(HSI_transformed, GT_transformed, random_state=42)
-            
-            train_dataset = torch.utils.data.TensorDataset(HSI_train, GT_train)
-            test_dataset = torch.utils.data.TensorDataset(HSI_test, GT_test)
+            train_hsi = np.concatenate([hsi_topleft, hsi_topright, hsi_bottomleft], axis=2)
+            train_gt = np.concatenate([gt_topleft, gt_topright, gt_bottomleft], axis=0)  # Ground truth should match the combined height
 
-            train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=128, shuffle=True)
-            test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=128)
-            print("train loader and test loader complete")
+            # Use one quadrant for testing
+            test_hsi = hsi_bottomright
+            test_gt = gt_bottomright
+
+            train_dataset = HSIDataset(train_hsi, train_gt)
+            test_dataset = HSIDataset(test_hsi, test_gt)
+
+            train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+            test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+
+            # Check batch shapes in DataLoader
+            for hsi_batch, gt_batch in train_loader:
+                print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, H, W)
+                print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
+                break  # Print only the first batch for verification
+
+            for hsi_batch, gt_batch in test_loader:
+                print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, H, W)
+                print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, H, W)
+                break  # Print only the first batch for verificatio
             return train_loader,test_loader
+        def padded_image(self):
+            return self.hsi_padded,self.gt_padded
+
+
+
+class HSIDataset(Dataset):
+    def __init__(self, hsi, gt):
+        """
+        Args:
+            hsi (numpy.ndarray): Hyperspectral image data with shape (H, W, C).
+            gt (numpy.ndarray): Ground truth data with shape (H, W).
+        """
+        self.hsi = torch.from_numpy(hsi).float()  # (H, W, C)
+        self.gt = torch.from_numpy(gt).float()  # (H, W)
+
+    def __len__(self):
+        return self.hsi.shape[2]  # Number of spectral bands (C)
+
+    def __getitem__(self, idx):
+        band = self.hsi[:, :, idx].unsqueeze(0)  # (H, W) -> (1, H, W)
+        gt = self.gt  # (H, W)
+        return band, gt
+    
+def split_image_into_quadrants(hsi, gt):
+    H, W, _ = hsi.shape
+    h_mid = H // 2
+    w_mid = W // 2
+
+    hsi_topleft = hsi[:h_mid, :w_mid, :]
+    hsi_topright = hsi[:h_mid, w_mid:, :]
+    hsi_bottomleft = hsi[h_mid:, :w_mid, :]
+    hsi_bottomright = hsi[h_mid:, w_mid:, :]
+
+    gt_topleft = gt[:h_mid, :w_mid]
+    gt_topright = gt[:h_mid, w_mid:]
+    gt_bottomleft = gt[h_mid:, :w_mid]
+    gt_bottomright = gt[h_mid:, w_mid:]
+
+    return (hsi_topleft, gt_topleft), (hsi_topright, gt_topright), (hsi_bottomleft, gt_bottomleft), (hsi_bottomright, gt_bottomright)
+
+def adjust_image_dimensions(hsi, gt):
+    H, W, C = hsi.shape
+    pad_h = (16 - H % 16) if H % 16 != 0 else 0
+    pad_w = (16 - W % 16) if W % 16 != 0 else 0
+    
+    # Pad the hyperspectral image
+    hsi_padded = np.pad(hsi, ((0, pad_h), (0, pad_w), (0, 0)), mode='constant')
+    # Pad the ground truth
+    gt_padded = np.pad(gt, ((0, pad_h), (0, pad_w)), mode='constant')
+    
+    return hsi_padded, gt_padded
+    
+def get_full_image_encoding(model, hsi_padded):
+    #i should alraed y be in eval mode
+    with torch.no_grad():  
+        hsi_tensor = torch.from_numpy(hsi_padded).float().unsqueeze(0).permute(0, 3, 1, 2).to('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Encode the entire image using the model
+        full_encoded_image = model.encoder(hsi_tensor)
+        
+    return full_encoded_image.cpu()
 
 def main():
+
     model = Autoencoder()
 
     #abstract out path later
@@ -121,12 +169,9 @@ def main():
     
     HSI = X.reshape((M, N, D)) 
     data = DataFormatter(HSI,GT)
+
     train_loader,test_loader = data()
-    
-    # sanity check,.
-    # for hsi_batch, gt_batch in train_loader:
-    #     print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, 64, 64)
-    #     print("GT Batch Shape:", gt_batch.shape)    # Should be (batch_size, 64, 64)
+    hsi_padded, gt_padded = data.padded_image()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -154,11 +199,9 @@ def main():
 
             running_loss += loss.item()
             if (i + 1) % 10 == 0:  # Print every 10 batches
-                print("does this, ever happen")
                 print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {running_loss / 10:.4f}')
                 running_loss = 0.0
 
-        # Validation after each epoch
         model.eval()
         total_loss = 0
         with torch.no_grad():
@@ -171,7 +214,8 @@ def main():
                 total_loss += loss.item()
 
         print(f'Validation Loss after Epoch [{epoch + 1}/{num_epochs}]: {total_loss / len(test_loader):.4f}')
-
+    # full_image_encoding = get_full_image_encoding(model, hsi_padded)
+    # print("Full Image Encoding Shape:", full_image_encoding.shape)
     torch.save(model.state_dict(), 'conv_autoencoder.pth')
 
 
