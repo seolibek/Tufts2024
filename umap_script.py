@@ -149,6 +149,11 @@ def k_means(ground_truth, dim_reduced_data=None, data=None, n_components=None, m
         kmeans = KMeans(n_clusters=num_clusters, random_state=42)
         labels = kmeans.fit_predict(dim_reduced_data)
         ari = adjusted_rand_score(GT_flat, labels)
+    
+    elif method == "LLE":
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+        labels = kmeans.fit_predict(dim_reduced_data)
+        ari = adjusted_rand_score(GT_flat, labels)  
         
     elif method == "KPCA":
         kmeans = KMeans(n_clusters=num_clusters, random_state=42)
