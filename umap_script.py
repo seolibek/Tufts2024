@@ -11,6 +11,7 @@ from sklearn.decomposition import PCA
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 from sklearn.manifold import TSNE
+from sklearn.decomposition import KernelPCA
 
 #rename whole thing as dimensionality reduction thing
 def loadHSI(data_path, ground_truth_path, data_col, ground_truth_col):
@@ -148,6 +149,14 @@ def k_means(ground_truth, dim_reduced_data=None, data=None, n_components=None, m
         kmeans = KMeans(n_clusters=num_clusters, random_state=42)
         labels = kmeans.fit_predict(dim_reduced_data)
         ari = adjusted_rand_score(GT_flat, labels)
+        
+    elif method == "KPCA":
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+        kpca = KernelPCA(n_components, kernel='cosine')
+        data_reduced = kpca.fit_transform(data)
+        labels = kmeans.fit_predict(data_reduced)
+        ari = adjusted_rand_score(GT_flat, labels) 
+      
     print(ari)
     print(labels)
     return ari, labels
