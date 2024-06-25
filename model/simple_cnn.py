@@ -29,7 +29,7 @@ class SimpleCNN(nn.Module):
         self.fc1 = nn.Linear(256 * 10 * 10, 1024)
         self.relu4 = nn.ReLU()
         self.dropout1 = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(1024, 512)
+        self.fc2 = nn.Linear(1024, 83*86)
         self.relu5 = nn.ReLU()
         self.dropout2 = nn.Dropout(0.5)
         self.softmax = nn.Softmax(dim=1)
@@ -92,18 +92,12 @@ def main():
     # Reshape HSI data
     HSI = X.reshape((M, N, D))  # Should already be (83, 86, 204)
     
-    HSI = torch.from_numpy(HSI).float().permute(2, 0, 1).unsqueeze(0)  # Shape: (1, 204, 83, 86)
-    bands = HSI[0]
-    labels = GT.flatten()
-    bands_with_channel = bands[:, np.newaxis, :, :]
+    HSI = torch.from_numpy(HSI).float().permute(2, 0, 1).unsqueeze(1)  # Shape: (1, 204, 83, 86)
+    labels = torch.from_numpy(GT).float().repeat(204, 1, 1)  # Shape: (204, 83, 86)
 
-    X_train_tensor = torch.from_numpy(bands_with_channel.numpy()).float()
-    y_train_tensor = torch.from_numpy(labels).long().flatten()
+    dataset = TensorDataset(HSI, labels)
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
 
-    print(X_train_tensor.shape)
-    print(y_train_tensor.shape)
-    
-    # Initialize model, loss, and optimizer
     model = SimpleCNN()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -112,30 +106,22 @@ def main():
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-        for inputs in X_train_tensor:
-            inputs = inputs.unsqueeze(0)  # Add batch dimension
+        for inputs, labels in dataloader:
             optimizer.zero_grad()
             outputs = model(inputs)
-            outputs_flat = outputs.view(-1)  # Shape: (83*86, )
-            print('fuck',outputs.shape)
-            labels = y_train_tensor.unsqueeze(0)  # Shape: (1,83, 86)
-            labels_flat = labels.view(-1)  # Shape: (83*86,)
+            
+            labels_flat = labels.view(16, 83 * 86)
 
-        
-            # Reshape outputs to match the labels
-            print(outputs.shape)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels_flat)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        print(f"Epoch {epoch+1}, Loss: {running_loss/len(X_train_tensor)}")
+        print(f"Epoch {epoch+1}, Loss: {running_loss/len(dataloader)}")
 
-    # Extract features using the trained model
     model.eval()
     with torch.no_grad():
         features = []
-    for inputs in X_train_tensor:
-        inputs = inputs.unsqueeze(0)  # Add batch dimension
+    for inputs, in dataloader:
         feature = model(inputs, feature_extraction=True)
         features.append(feature.squeeze().numpy())
     features = np.array(features)
