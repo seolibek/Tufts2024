@@ -208,11 +208,18 @@ def main():
 
         print(f'Validation Loss after Epoch [{epoch + 1}/{num_epochs}]: {total_loss / len(test_loader):.4f}')
 
+<<<<<<< Updated upstream
 # #here i should comine the pieces to make a full encoded image..
 # #main issue - the padding. Due to padding, when i am adding images tog, it does not correctly combine them (influenced by the 0s)
 #     hsi_padded, padding = adjust_image_dimensions(HSI)
 #     full_encoded_image = get_full_image_encoding(model, hsi_padded)#error message: RuntimeError: Given groups=1, weight of size [16, 1, 3, 3], expected input[1, 204, 48, 48] to have 1 channels, but got 204 channels instead
 
+=======
+# #here i should comine the pieces to make a full encoded image..Full Image Encoding Shape: torch.Size([1, 26112, 5, 5]).. fix.
+# #main issue - the padding. Due to padding, when i am adding images tog, it does not correctly combine them (influenced by the 0s)
+#     hsi_padded, padding = adjust_image_dimensions(HSI)
+#     full_encoded_image = get_full_image_encoding(model, hsi_padded)
+>>>>>>> Stashed changes
 #     original_h, original_w, _ = HSI.shape
 #     hsi_padded, (pad_h, pad_w) = data.padding()
 
