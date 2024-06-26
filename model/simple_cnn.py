@@ -16,18 +16,15 @@ class SimpleCNN(nn.Module):
         super(SimpleCNN, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=204, out_channels=164, kernel_size=3, stride=1, padding=1)
         self.relu = nn.LeakyReLU()
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-
         self.conv2 = nn.Conv2d(in_channels=164, out_channels=100, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(in_channels=100, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(64, 128) 
+        self.fc1 = nn.Linear(576, 128) 
         self.fc2 = nn.Linear(128, 7)  
 
 
     def forward(self, x, feature_extraction = False):
         x = self.conv1(x)
         x = self.relu(x)
-        x = self.pool(x)              
 
         x = self.conv2(x)
         x = self.relu(x)
@@ -61,6 +58,15 @@ def calculate_aligned_accuracy(ground_truth, cluster_labels):
 
     return accuracy
 
+def extract_patches(hsi, patch_size):
+    M, N, D = hsi.shape
+    padded_hsi = np.pad(hsi, ((patch_size//2, patch_size//2), (patch_size//2, patch_size//2), (0, 0)), mode='reflect')
+    patches = []
+    for i in range(M):
+        for j in range(N):
+            patch = padded_hsi[i:i+patch_size, j:j+patch_size, :]
+            patches.append(patch)
+    return np.array(patches)
 
 def main():      
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
@@ -71,15 +77,13 @@ def main():
     print("Converted ground truth labels (unique values):", np.unique(GT))
     # Reshape HSI data
     HSI = X.reshape((M, N, D))  
-    HSI = torch.from_numpy(HSI).float().permute(2, 0, 1).unsqueeze(0) 
-    labels = torch.from_numpy(GT).long().flatten() 
+    patch_size = 3
+    patches = extract_patches(HSI, patch_size)
+    patches = patches.reshape(-1, patch_size, patch_size, D)
+    patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size)
+    labels = torch.from_numpy(GT).long().flatten()  # Shape: (M*N,)
 
-    # print(HSI.shape)  # (1, 204, 83, 86)
-    # print(labels.shape)  # (83*86,)
-    
-    HSI = HSI.permute(2, 3, 1, 0).reshape(-1, 204, 1, 1)  # Shape: (83*86, 204, 1, 1) - individual pixels
-    labels = labels  # Shape: (83*86,)
-    dataset = TensorDataset(HSI, labels)
+    dataset = TensorDataset(patches, labels)
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
 
     model = SimpleCNN()
@@ -91,6 +95,7 @@ def main():
         model.train()
         running_loss = 0.0
         for inputs, labels in dataloader:
+            print(inputs.shape)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
