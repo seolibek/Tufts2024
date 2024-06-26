@@ -64,6 +64,8 @@ def tensor_to_image(tensor):
     image = Image.fromarray((tensor * 255).astype('uint8'))
     return image
 
+
+
 def main():      
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
     salinasA_gt_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_gt.mat'
@@ -105,7 +107,7 @@ def main():
     
     model.eval()
     total_loss = 0.0
-    save_path = 'reconstructed'
+    save_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed'
     os.makedirs(save_path, exist_ok=True)
     with torch.no_grad():
     
