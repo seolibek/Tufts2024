@@ -1,140 +1,137 @@
 import torch
 import torch.nn as nn
 from utils import loadHSI
-from torchvision import transforms
-import torch.nn.functional as F
-from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset
+from sklearn.cluster import KMeans
 import numpy as np
-print("import complete")
+from torch.utils.data import DataLoader, TensorDataset
+from PIL import Image
+import os
 
-#########################
-# TODO:
-
-#currently adjusted to salinas A, size 83 x 86, 204 bands
-class Autoencoder(nn.Module):
+class SimpleAutoencoder(nn.Module):
     def __init__(self):
-        super(Autoencoder, self).__init__()
-        print("autoencoder initialized")
-        self.encoder = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),  # (B, 1, 64, 64) -> (B, 16, 32, 32)
-            nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),  # (B, 16, 32, 32) -> (B, 32, 16, 16)
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),  # (B, 32, 16, 16) -> (B, 64, 8, 8)
-            nn.ReLU(),
-        )
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 64, 8, 8) -> (B, 32, 16, 16)
-            nn.ReLU(),
-            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),  # (B, 32, 16, 16) -> (B, 16, 32, 32)
-            nn.ReLU(),
-            nn.ConvTranspose2d(16, 1, kernel_size=3, stride=2, padding=1, output_padding=1),   # (B, 16, 32, 32) -> (B, 1, 64, 64)
-            nn.Sigmoid()  # Using Sigmoid to get outputs between 0 and 1
-        )
+        super(SimpleAutoencoder, self).__init__()
+        # Encoder
+        self.conv1 = nn.Conv2d(in_channels=204, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.relu = nn.LeakyReLU()
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.encoder_fc = nn.Linear(32 * 5 * 5, 128)
+
+        # Decoder
+        self.decoder_fc = nn.Linear(128, 32 * 5 * 5)
+        self.deconv1 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=204, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
-    def embedding(self,x):
-        return self.encoder(x)
+        # Encoder
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = x.view(x.size(0), -1)
+        x = self.encoder_fc(x)
+        encoded_features = self.relu(x)
+
+        # Decoder
+        x = self.decoder_fc(encoded_features)
+        x = self.relu(x)
+        x = x.view(x.size(0), 32, 5, 5)  # Adjust the shape to match the output of the last conv layer in the encoder
+        x = self.deconv1(x)
+        x = self.relu(x)
+        x = self.deconv2(x)
+
+        return x, encoded_features
+
+def extract_patches(hsi, patch_size):
+    M, N, D = hsi.shape
+    padded_hsi = np.pad(hsi, ((patch_size//2, patch_size//2), (patch_size//2, patch_size//2), (0, 0)), mode='reflect')
+    patches = []
+    for i in range(M):
+        for j in range(N):
+            patch = padded_hsi[i:i+patch_size, j:j+patch_size, :]
+            patches.append(patch)
+    return np.array(patches)
+
+
+def tensor_to_image(tensor):
+    tensor = tensor.cpu().detach()
     
-class ResizeAndToTensor:
-        def __init__(self, size):
-            self.size = size
+    tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min())
+    
+    tensor = tensor[:3, :, :]  # Taking only the first 3 channels for visualization as RGB
 
-        def __call__(self, band):
+    tensor = tensor.numpy()
+    tensor = np.transpose(tensor, (1, 2, 0))  # Change to HWC format
+    image = Image.fromarray((tensor * 255).astype('uint8'))
+    return image
 
-            band = torch.from_numpy(band).float()  
-            band = band.unsqueeze(0).unsqueeze(0) #(83, 86) -> (1, 1, 83, 86)
-            band = F.interpolate(band, size=self.size, mode='bilinear', align_corners=False) #(1, 1, 83, 86) -> (1, 1, 64, 64)
-            band = band.squeeze(0) #(1, 1, 64, 64) -> (1, 64, 64) squeeze only once - keeping 1 for the channel dims, which  isnt needed for gt
-
-          
-
-            return band
-class DataFormatter:
-        def __init__(self, hsi):
-            self.hsi = hsi
-        def __call__(self):
-            transform = ResizeAndToTensor(size=(64, 64))
-            
-            HSI_transformed = []
-
-            for band_idx in range(self.hsi.shape[2]):  # looping over each spectral band, treating them like samples
-                band = self.hsi[:, :, band_idx]
-                band_t = transform(band)
-                HSI_transformed.append(band_t)
-
-            # Convert lists to tensors.. idk y but not doing this breaks training process later...
-            HSI_transformed = torch.stack(HSI_transformed)
-            
-            #potential issue in the train_test_split...
-            HSI_transformed = HSI_transformed.unsqueeze(1)  # reshaped for the num spectral bands (204, 1, 64, 64)
-            HSI_transformed = HSI_transformed.squeeze(1)  
-            
-            train_dataset = torch.utils.data.TensorDataset(HSI_transformed)
-
-            train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=128, shuffle=True)
-            print("train loader and test loader complete")
-            return train_loader
-
-def main():
-    model = Autoencoder()
-
-    #abstract out path later
+def main():      
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
     salinasA_gt_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_gt.mat'
-    #and loadHSI stuff..
-
     X, M, N, D, HSI, GT, Y, n, K = loadHSI(salinasA_path, salinasA_gt_path, 'salinasA_corrected', 'salinasA_gt')
-    #i am redefnig HSI here bc it became weired from some of the other stuff we did in load HSI where we were flattening the image
-
-    #above, loaded data, where the data is HSI and ground truth is GT. then shape of the HSI data is 83 x 86 x 204 and GT is 83 x 86
     
-    HSI = X.reshape((M, N, D)) 
-    data = DataFormatter(HSI)
-    train_loader = data()
+    GT = GT - 1  # Convert to 0-based indexing.. necessary unfortunately whatever
+    HSI = X.reshape((M, N, D))  
+    patch_size = 5
+    patches = extract_patches(HSI, patch_size)
+    patches = patches.reshape(-1, patch_size, patch_size, D)
+    patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size)
     
-    # sanity check,.
-    # for hsi_batch, gt_batch in train_loader:
-    #     print("HSI Batch Shape:", hsi_batch.shape)  # Should be (batch_size, 1, 64, 64)
-    #     print("GT Batch Shape:", _batch.shape)    # Should be (batch_size, 64, 64)
+    labels = torch.from_numpy(GT).long().flatten()  # Shape: (M*N,)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
+    dataset = TensorDataset(patches)
+    #dataset size is 7138, as expected
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
 
-    mse = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-    # Train the autoencoder
-    num_epochs = 30
-    print(len(train_loader))
-
+    model = SimpleAutoencoder()
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    
+    num_epochs = 10
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-        
-        for i, (hsi_batch) in enumerate(train_loader):
-            hsi_batch = hsi_batch.to(device)
-
+        for inputs in dataloader:
+            inputs = inputs[0]
             optimizer.zero_grad()
-            outputs = model(hsi_batch)
-            loss = mse(outputs, hsi_batch)  # Autoencoder reconstructs the input
+            reconstructed, _ = model(inputs)
+            loss = criterion(reconstructed, inputs)  
             loss.backward()
             optimizer.step()
-
             running_loss += loss.item()
-            if (i + 1) % 10 == 0:  # Print every 10 batches
-                print("does this, ever happen")
-                print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {running_loss / 10:.4f}')
-                running_loss = 0.0
+        scheduler.step()
+        print(f"Epoch {epoch+1}, Loss: {running_loss/len(dataloader)}")
 
+    
+    model.eval()
+    total_loss = 0.0
+    save_path = 'reconstructed'
+    os.makedirs(save_path, exist_ok=True)
+    with torch.no_grad():
+    
+        for i, batch in enumerate(dataloader):
+            inputs = batch[0]  
+            reconstructed, _ = model(inputs)
+            loss = criterion(reconstructed, inputs)
+            total_loss += loss.item()
+            
+            for j, rec in enumerate(reconstructed):
+                img = tensor_to_image(rec)
+                img.save(os.path.join(save_path, f'reconstructed_image_{i*inputs.size(0) + j}.png'))
         
+        average_loss = total_loss / len(dataloader)
+        print(f"Average Reconstruction Loss: {average_loss}")
 
-    torch.save(model.state_dict(), 'conv_autoencoder.pth')
+    # kmeans = KMeans(n_clusters=7, random_state=0).fit(features)
+    # cluster_labels = kmeans.labels_
+    # print(cluster_labels.shape) #shape is 7138,
+    # print(GT.shape)
+
+    # accuracy = calculate_aligned_accuracy(GT, cluster_labels)
+    # print(f"Aligned Accuracy: {accuracy}")
 
 
+
+    
 if __name__ == "__main__":
     main()

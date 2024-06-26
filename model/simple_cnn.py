@@ -10,11 +10,12 @@ from torch.utils.data import DataLoader, TensorDataset
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=204, out_channels=164, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=204, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.relu = nn.LeakyReLU()
-        self.conv2 = nn.Conv2d(in_channels=164, out_channels=100, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=100, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(576, 128) 
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1)
+        # self.conv3 = nn.Conv2d(in_channels=100, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(32*5*5, 128) #make this automized.. out channels * patch area
+        # self.dropout = nn.Dropout(p=0.5)  
         self.fc2 = nn.Linear(128, 7)  
 
 
@@ -25,8 +26,6 @@ class SimpleCNN(nn.Module):
         x = self.conv2(x)
         x = self.relu(x)
 
-        x = self.conv3(x)
-        x = self.relu(x)
         x = x.view(x.size(0), -1)  
 
         if feature_extraction:
@@ -34,17 +33,12 @@ class SimpleCNN(nn.Module):
         
         x = self.fc1(x)
         x = self.relu(x)
+        # x = self.dropout(x)
         x = self.fc2(x)
         return x
     
 def calculate_aligned_accuracy(ground_truth, cluster_labels):
     true_labels = ground_truth.flatten()
-    
-    # print(f"True labels shape: {true_labels.shape}")
-    # print(f"Cluster labels shape: {cluster_labels.shape}")
-    # print(f"Unique true labels: {np.unique(true_labels)}")
-    # print(f"Unique cluster labels: {np.unique(cluster_labels)}")
-
     cm = confusion_matrix(true_labels, cluster_labels)
     row_ind, col_ind = linear_sum_assignment(-cm)
     label_mapping = {col_ind[i]: row_ind[i] for i in range(len(row_ind))}
@@ -70,10 +64,9 @@ def main():
     X, M, N, D, HSI, GT, Y, n, K = loadHSI(salinasA_path, salinasA_gt_path, 'salinasA_corrected', 'salinasA_gt')
     
     GT = GT - 1  # Convert to 0-based indexing.. necessary unfortunately whatever
-    print("Converted ground truth labels (unique values):", np.unique(GT))
     # Reshape HSI data
     HSI = X.reshape((M, N, D))  
-    patch_size = 3
+    patch_size = 5
     patches = extract_patches(HSI, patch_size)
     patches = patches.reshape(-1, patch_size, patch_size, D)
     patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size)
@@ -84,20 +77,21 @@ def main():
 
     model = SimpleCNN()
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay = 1e-5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 10, gamma = 0.1)
+   
     num_epochs = 20
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
         for inputs, labels in dataloader:
-            print(inputs.shape)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
+        scheduler.step()
         print(f"Epoch {epoch+1}, Loss: {running_loss/len(dataloader)}")
 
     model.eval()
