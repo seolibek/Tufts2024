@@ -7,10 +7,6 @@ from sklearn.metrics import confusion_matrix
 from scipy.optimize import linear_sum_assignment
 from torch.utils.data import DataLoader, TensorDataset
 
-
-import torch
-import torch.nn as nn
-
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
