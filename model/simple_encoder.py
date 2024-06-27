@@ -79,7 +79,6 @@ def main():
     patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size)
     
     labels = torch.from_numpy(GT).long().flatten()  # Shape: (M*N,)
-
     dataset = TensorDataset(patches)
     #dataset size is 7138, as expected
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
