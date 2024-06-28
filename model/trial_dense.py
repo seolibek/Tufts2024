@@ -2,17 +2,17 @@ import torch
 import torch.nn as nn
 from utils import loadHSI, calculate_aligned_accuracy
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from PIL import Image
 import os
-from sklearn.preprocessing import StandardScaler
 
-class SimpleAutoencoder(nn.Module):
+class FullyConnectedAutoencoder(nn.Module):
     def __init__(self):
-        super(SimpleAutoencoder, self).__init__()
+        super(FullyConnectedAutoencoder, self).__init__()
         # Encoder
-        self.encoder_fc1 = nn.Linear(1, 256)
+        self.encoder_fc1 = nn.Linear(204, 256)
         self.bn_fc1 = nn.BatchNorm1d(256)
         self.encoder_fc2 = nn.Linear(256, 128)
         self.bn_fc2 = nn.BatchNorm1d(128)
@@ -29,19 +29,14 @@ class SimpleAutoencoder(nn.Module):
         self.bn_fc6 = nn.BatchNorm1d(128)
         self.decoder_fc3 = nn.Linear(128, 256)
         self.bn_fc7 = nn.BatchNorm1d(256)
-        self.decoder_fc4 = nn.Linear(256, 1)
-        self.bn_fc8 = nn.BatchNorm1d(1)
+        self.decoder_fc4 = nn.Linear(256, 204)
+        self.bn_fc8 = nn.BatchNorm1d(204)
         
         self._initialize_weights()
 
     def _initialize_weights(self):
-        # Initialize weights to avoid extremely small values
         for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
+            if isinstance(m, nn.Linear):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
                 nn.init.constant_(m.bias, 0)
 
@@ -77,7 +72,6 @@ class SimpleAutoencoder(nn.Module):
         return x, encoded_features
 
 def save_original_hsi_as_image(hsi, save_path):
-    
     hsi_min = hsi.min(axis=(0, 1), keepdims=True)
     hsi_max = hsi.max(axis=(0, 1), keepdims=True)
     hsi_normalized = (hsi - hsi_min) / (hsi_max - hsi_min)
@@ -92,7 +86,6 @@ def save_original_hsi_as_image(hsi, save_path):
 
     img.save(save_path)
     print(f"Original HSI image saved as RGB at: {save_path}")
-
 
 def extract_patches(hsi, patch_size):
     M, N, D = hsi.shape
@@ -120,77 +113,66 @@ def reassemble_image(patches, M, N, patch_size):
             patch_count[i_start:i_end, j_start:j_end, :] += 1
             idx += 1
 
-    reconstructed_image /= np.maximum(patch_count, 1) 
+    reconstructed_image /= np.maximum(patch_count, 1)
 
     return reconstructed_image
 
-
 def tensor_to_image(tensor):
-    tensor = tensor.squeeze()  
-    
+    tensor = tensor.squeeze()
+
     print(f"Tensor shape: {tensor.shape}")
     print(f"Tensor min: {tensor.min()}, Tensor max: {tensor.max()}")
-    
-    tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min()) 
-    tensor = (tensor * 255).to(torch.uint8)  
-    
+
+    tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min())
+    tensor = (tensor * 255).to(torch.uint8)
+
     tensor = tensor.cpu().numpy()
 
-    # print(f"Converted tensor min: {tensor.min()}, Converted tensor max: {tensor.max()}")
-    
     if tensor.ndim == 2:  # Grayscale image
         return Image.fromarray(tensor, mode='L')
     elif tensor.ndim == 3 and tensor.shape[2] == 3:  # RGB image
         return Image.fromarray(tensor, mode='RGB')
     elif tensor.ndim == 3 and tensor.shape[2] == 204:  # Hyperspectral image, need to reduce dimensions
-        # Example: Convert to RGB by taking the first three channels
         rgb_image = tensor[:, :, :3]
         return Image.fromarray(rgb_image, mode='RGB')
     else:
         raise ValueError("Unexpected tensor shape for image conversion")
 
-
-
-def main():      
+def main():
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
     salinasA_gt_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_gt.mat'
     X, M, N, D, HSI, GT, Y, n, K = loadHSI(salinasA_path, salinasA_gt_path, 'salinasA_corrected', 'salinasA_gt')
-    
+
     GT = GT - 1  # Convert to 0-based indexing.. necessary
-    HSI = X.reshape((M, N, D))  
-    save_path = "/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed/orginal_img.png" 
+    HSI = X.reshape((M, N, D))
+    save_path = "/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed/orginal_img.png"
     directory = os.path.dirname(save_path)
-    
-    os.makedirs(directory, exist_ok=True)  
-    
+
+    os.makedirs(directory, exist_ok=True)
+
     if os.path.isdir(save_path):
         raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
-    img = save_original_hsi_as_image(HSI,save_path)
+    img = save_original_hsi_as_image(HSI, save_path)
 
     patch_size = 1
     patches = extract_patches(HSI, patch_size)
-    print(f"Extracted patches shape: {patches.shape}") #(7138,1,1,204)
+    print(f"Extracted patches shape: {patches.shape}")  # Expected: (7138, 1, 1, 204)
 
-    patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size) -> (7138,204,1,1)
-    print(f"Patches permuted for input: {patches.shape}")
+    patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (7138, 204, 1, 1)
+    patches = patches.view(-1, 204)  # Flatten to (7138, 204)
+    print(f"Patches reshaped for input: {patches.shape}")
 
     labels = torch.from_numpy(GT).long().flatten()  # Shape: (M*N,)
     dataset = TensorDataset(patches)
-    #dataset size is 7138, as expected
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+    torch.set_printoptions(profile='full')
 
-    # for i, (inputs,) in enumerate(dataloader):
-    #     print(f"Batch {i} shape: {inputs.shape}")
-    #     if i == 2:  # Check first few batches
-    #         break
-    # #in dataloader, the bathces shapes are [16,204,1,1], as expected
-
-    model = SimpleAutoencoder()
+    model = FullyConnectedAutoencoder()
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-    
-    num_epochs = 5
+
+    num_epochs = 10
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -198,76 +180,72 @@ def main():
             inputs = inputs[0]
             optimizer.zero_grad()
             reconstructed, _ = model(inputs)
-            loss = criterion(reconstructed, inputs)  
+            loss = criterion(reconstructed, inputs)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
         scheduler.step()
-        print(f"Epoch {epoch+1}, Loss: {running_loss/len(dataloader)}")
+        print(f"Epoch {epoch + 1}, Loss: {running_loss / len(dataloader)}")
 
-    
     model.eval()
     total_loss = 0.0
     reconstructed_patches = []
     feature_list = []
 
-    # save_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed'
-    # os.makedirs(save_path, exist_ok=True)
     with torch.no_grad():
         for batch in dataloader:
-            inputs = batch[0]  
+            inputs = batch[0]
             reconstructed, features = model(inputs)
             loss = criterion(reconstructed, inputs)
             total_loss += loss.item()
             reconstructed_patches.append(reconstructed.cpu().numpy())
             feature_list.append(features.cpu().numpy())
-            
+
         average_loss = total_loss / len(dataloader)
         print(f"Average Reconstruction Loss: {average_loss}")
-        reconstructed_patches = np.concatenate(reconstructed_patches, axis = 0)
-        reconstructed_image = reassemble_image(reconstructed_patches, M, N, patch_size)
-        img = tensor_to_image(torch.tensor(reconstructed_image))
+        # reconstructed_patches = np.concatenate(reconstructed_patches, axis=0)
+        # reconstructed_image = reassemble_image(reconstructed_patches, M, N, patch_size)
+        # img = tensor_to_image(torch.tensor(reconstructed_image))
 
-        save_path = "/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed/img.png" 
-        directory = os.path.dirname(save_path)
-        
-        os.makedirs(directory, exist_ok=True)  
-        
-        if os.path.isdir(save_path):
-            raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
-        img.save(save_path)
-    
-            
-    feature_list = np.vstack(feature_list) 
-    # print(f"Extracted features shape: {feature_list.shape}")#shape is? 7138,7
+        # save_path = "/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed/img.png"
+        # directory = os.path.dirname(save_path)
 
-    scaling_factor = 1e15
+        # os.makedirs(directory, exist_ok=True)
+
+        # if os.path.isdir(save_path):
+        #     raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
+        # img.save(save_path)
+
+    feature_list = np.vstack(feature_list)
+    print(f"Extracted features shape: {feature_list.shape}")
+
+    # Scale features by a large constant
+    scaling_factor = 1e10
     scaled_features = feature_list * scaling_factor
     print(f"Scaled features sample: {scaled_features[:5]}")
 
-
-    # Normalize features using StandardScaler? turns everything to 0 rn, values too small.. scaling cactor should be greater?
+    # Normalize features using StandardScaler
     scaler = StandardScaler()
     normalized_features = scaler.fit_transform(scaled_features)
     print(f"Normalized features sample: {normalized_features[:5]}")
 
-    
+    # Check for unique features
     unique_features = np.unique(normalized_features, axis=0)
-    print(f"Number of unique features: {normalized_features.shape[0]}")
-    print(f"Unique features: {normalized_features}")
+    print(f"Number of unique features: {unique_features.shape[0]}")
+    print(f"Unique features: {unique_features}")
 
-
+    # Fit KMeans and check cluster labels shape
     kmeans = KMeans(n_clusters=7, random_state=0).fit(normalized_features)
     cluster_labels = kmeans.labels_
-    print(cluster_labels.shape) #shape is 7138,
-    print(GT.shape)
+    print(f"Cluster labels shape: {cluster_labels.shape}")  # Should be (7138,)
+    print(f"GT shape: {GT.shape}")  # Should be (7138,)
 
-    accuracy = calculate_aligned_accuracy(GT, cluster_labels)
+    # Ensure the cluster labels match the ground truth shape
+    cluster_labels = cluster_labels.reshape(M, N)
+    print(f"Reshaped cluster labels shape: {cluster_labels.shape}")
+
+    accuracy = calculate_aligned_accuracy(GT, cluster_labels.flatten())
     print(f"Aligned Accuracy: {accuracy}")
 
-
-# Unique features: [[-3.9007525e-40  1.0889989e-38 -1.8682532e-40 -2.3100405e-40
-#   -2.1018636e-40  6.3795996e-38 -5.3876983e-40]] ! SO SMALL WHAT
-    
 if __name__ == "__main__":
     main()
