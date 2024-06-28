@@ -30,7 +30,7 @@ class SimpleCNN(nn.Module):
 
         if feature_extraction:
             return x
-        
+        # print(f'the shape here is hfkjsdfhsk{x.shape}') #(16,800)
         x = self.fc1(x)
         x = self.relu(x)
         # x = self.dropout(x)
@@ -80,7 +80,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay = 1e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 10, gamma = 0.1)
    
-    num_epochs = 20
+    num_epochs = 5
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -101,6 +101,7 @@ def main():
             feature = model(inputs, feature_extraction=True)
             features.append(feature.cpu().numpy())
     features = np.vstack(features)
+
     print(f"Extracted features shape: {features.shape}")
 
     kmeans = KMeans(n_clusters=7, random_state=0).fit(features)

@@ -15,8 +15,10 @@ class SimpleAutoencoder(nn.Module):
         self.relu = nn.LeakyReLU()
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1)
         self.encoder_fc = nn.Linear(32 * 1 * 1, 128)
+        self.encoder_fc2 = nn.Linear(128, 7)  
 
         # Decoder
+        self.decoder_fc2 = nn.Linear(7,128)
         self.decoder_fc = nn.Linear(128, 32 * 1 * 1)
         self.deconv1 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=204, kernel_size=3, stride=1, padding=1)
@@ -29,10 +31,13 @@ class SimpleAutoencoder(nn.Module):
         x = self.relu(x)
         x = x.view(x.size(0), -1)
         x = self.encoder_fc(x)
+        x = self.encoder_fc2(x)
         encoded_features = self.relu(x)
+        # print(f'screamscraeesms{encoded_features.shape}') #it looks like 
 
         # Decoder
-        x = self.decoder_fc(encoded_features)
+        x = self.decoder_fc2(encoded_features)
+        x = self.decoder_fc(x)
         x = self.relu(x)
         x = x.view(x.size(0), 32, 1, 1)  
         x = self.deconv1(x)
@@ -132,25 +137,30 @@ def main():
         raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
     img = save_original_hsi_as_image(HSI,save_path)
 
-
-
-
     patch_size = 1
     patches = extract_patches(HSI, patch_size)
-    patches = patches.reshape(-1, patch_size, patch_size, D)
-    patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size)
-    
+    print(f"Extracted patches shape: {patches.shape}") #(7138,1,1,204)
+
+    patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size) -> (7138,204,1,1)
+    print(f"Patches permuted for input: {patches.shape}")
+
     labels = torch.from_numpy(GT).long().flatten()  # Shape: (M*N,)
     dataset = TensorDataset(patches)
     #dataset size is 7138, as expected
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+
+    # for i, (inputs,) in enumerate(dataloader):
+    #     print(f"Batch {i} shape: {inputs.shape}")
+    #     if i == 2:  # Check first few batches
+    #         break
+    # #in dataloader, the bathces shapes are [16,204,1,1], as expected
 
     model = SimpleAutoencoder()
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
     
-    num_epochs = 10
+    num_epochs = 5
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -196,11 +206,12 @@ def main():
         if os.path.isdir(save_path):
             raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
         img.save(save_path)
+    
             
-    features = np.vstack(features) 
-    print(f"Extracted features shape: {features.shape}")#shape is?
+    feature_list = np.vstack(feature_list) 
+    print(f"Extracted features shape: {feature_list.shape}")#shape is?
 
-    kmeans = KMeans(n_clusters=7, random_state=0).fit(features)
+    kmeans = KMeans(n_clusters=7, random_state=0).fit(feature_list)
     cluster_labels = kmeans.labels_
     print(cluster_labels.shape) #shape is 7138,
     print(GT.shape)
