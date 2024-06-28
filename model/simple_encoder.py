@@ -12,13 +12,13 @@ class SimpleAutoencoder(nn.Module):
     def __init__(self):
         super(SimpleAutoencoder, self).__init__()
         # Encoder
-        self.conv1 = nn.Conv2d(in_channels=204, out_channels=128, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=204, out_channels=128, kernel_size=1, stride=1, padding=1)
         self.bn1 = nn.BatchNorm2d(128)
-        self.conv2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=1, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=1, stride=1, padding=1)
         self.bn3 = nn.BatchNorm2d(32)
-        self.encoder_fc1 = nn.Linear(32 * 5 * 5, 256)
+        self.encoder_fc1 = nn.Linear(32 * 1 * 1, 256)
         self.bn_fc1 = nn.BatchNorm1d(256)
         self.encoder_fc2 = nn.Linear(256, 128)
         self.bn_fc2 = nn.BatchNorm1d(128)
@@ -31,8 +31,8 @@ class SimpleAutoencoder(nn.Module):
         self.bn_fc4 = nn.BatchNorm1d(128)
         self.decoder_fc2 = nn.Linear(128, 256)
         self.bn_fc5 = nn.BatchNorm1d(256)
-        self.decoder_fc3 = nn.Linear(256, 32 * 5 * 5)
-        self.bn_fc6 = nn.BatchNorm1d(32 * 5 * 5)
+        self.decoder_fc3 = nn.Linear(256, 32 * 1 * 1)
+        self.bn_fc6 = nn.BatchNorm1d(32 * 1 * 1)
         self.deconv3 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.bn4 = nn.BatchNorm2d(64)
         self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
@@ -85,7 +85,7 @@ class SimpleAutoencoder(nn.Module):
         x = self.decoder_fc3(x)
         x = self.bn_fc6(x)
         x = self.relu(x)
-        x = x.view(x.size(0), 32, 5, 5)
+        x = x.view(x.size(0), 32, 1, 1)
         x = self.deconv3(x)
         x = self.bn4(x)
         x = self.relu(x)
@@ -189,7 +189,7 @@ def main():
         raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
     img = save_original_hsi_as_image(HSI,save_path)
 
-    patch_size = 5
+    patch_size = 1
     patches = extract_patches(HSI, patch_size)
     print(f"Extracted patches shape: {patches.shape}") #(7138,1,1,204)
 
