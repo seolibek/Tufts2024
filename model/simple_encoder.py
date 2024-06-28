@@ -6,43 +6,95 @@ import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from PIL import Image
 import os
+from sklearn.preprocessing import StandardScaler
 
 class SimpleAutoencoder(nn.Module):
     def __init__(self):
         super(SimpleAutoencoder, self).__init__()
         # Encoder
-        self.conv1 = nn.Conv2d(in_channels=204, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=204, out_channels=128, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(128)
+        self.conv2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(32)
+        self.encoder_fc1 = nn.Linear(32 * 5 * 5, 256)
+        self.bn_fc1 = nn.BatchNorm1d(256)
+        self.encoder_fc2 = nn.Linear(256, 128)
+        self.bn_fc2 = nn.BatchNorm1d(128)
+        self.encoder_fc3 = nn.Linear(128, 7)
+        self.bn_fc3 = nn.BatchNorm1d(7)
         self.relu = nn.LeakyReLU()
-        self.conv2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.encoder_fc = nn.Linear(32 * 1 * 1, 128)
-        self.encoder_fc2 = nn.Linear(128, 7)  
 
         # Decoder
-        self.decoder_fc2 = nn.Linear(7,128)
-        self.decoder_fc = nn.Linear(128, 32 * 1 * 1)
-        self.deconv1 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=204, kernel_size=3, stride=1, padding=1)
+        self.decoder_fc1 = nn.Linear(7, 128)
+        self.bn_fc4 = nn.BatchNorm1d(128)
+        self.decoder_fc2 = nn.Linear(128, 256)
+        self.bn_fc5 = nn.BatchNorm1d(256)
+        self.decoder_fc3 = nn.Linear(256, 32 * 5 * 5)
+        self.bn_fc6 = nn.BatchNorm1d(32 * 5 * 5)
+        self.deconv3 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.bn4 = nn.BatchNorm2d(64)
+        self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
+        self.bn5 = nn.BatchNorm2d(128)
+        self.deconv1 = nn.ConvTranspose2d(in_channels=128, out_channels=204, kernel_size=3, stride=1, padding=1)
+        self.bn6 = nn.BatchNorm2d(204)
+        
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        # Initialize weights to avoid extremely small values
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         # Encoder
         x = self.conv1(x)
+        x = self.bn1(x)
         x = self.relu(x)
         x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu(x)
+        x = self.conv3(x)
+        x = self.bn3(x)
         x = self.relu(x)
         x = x.view(x.size(0), -1)
-        x = self.encoder_fc(x)
+        x = self.encoder_fc1(x)
+        x = self.bn_fc1(x)
+        x = self.relu(x)
         x = self.encoder_fc2(x)
-        encoded_features = self.relu(x)
-        # print(f'screamscraeesms{encoded_features.shape}') #it looks like 
+        x = self.bn_fc2(x)
+        x = self.relu(x)
+        x = self.encoder_fc3(x)
+        encoded_features = self.bn_fc3(x)
+        encoded_features = self.relu(encoded_features)
 
         # Decoder
-        x = self.decoder_fc2(encoded_features)
-        x = self.decoder_fc(x)
+        x = self.decoder_fc1(encoded_features)
+        x = self.bn_fc4(x)
         x = self.relu(x)
-        x = x.view(x.size(0), 32, 1, 1)  
-        x = self.deconv1(x)
+        x = self.decoder_fc2(x)
+        x = self.bn_fc5(x)
+        x = self.relu(x)
+        x = self.decoder_fc3(x)
+        x = self.bn_fc6(x)
+        x = self.relu(x)
+        x = x.view(x.size(0), 32, 5, 5)
+        x = self.deconv3(x)
+        x = self.bn4(x)
         x = self.relu(x)
         x = self.deconv2(x)
+        x = self.bn5(x)
+        x = self.relu(x)
+        x = self.deconv1(x)
+        x = self.bn6(x)
+        x = self.relu(x)
 
         return x, encoded_features
 
@@ -137,7 +189,7 @@ def main():
         raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
     img = save_original_hsi_as_image(HSI,save_path)
 
-    patch_size = 1
+    patch_size = 5
     patches = extract_patches(HSI, patch_size)
     print(f"Extracted patches shape: {patches.shape}") #(7138,1,1,204)
 
@@ -209,9 +261,25 @@ def main():
     
             
     feature_list = np.vstack(feature_list) 
-    print(f"Extracted features shape: {feature_list.shape}")#shape is?
+    # print(f"Extracted features shape: {feature_list.shape}")#shape is? 7138,7
 
-    kmeans = KMeans(n_clusters=7, random_state=0).fit(feature_list)
+    scaling_factor = 1e15
+    scaled_features = feature_list * scaling_factor
+    print(f"Scaled features sample: {scaled_features[:5]}")
+
+
+    # Normalize features using StandardScaler? turns everything to 0 rn, values too small.. scaling cactor should be greater?
+    scaler = StandardScaler()
+    normalized_features = scaler.fit_transform(scaled_features)
+    print(f"Normalized features sample: {normalized_features[:5]}")
+
+    
+    unique_features = np.unique(normalized_features, axis=0)
+    print(f"Number of unique features: {normalized_features.shape[0]}")
+    print(f"Unique features: {normalized_features}")
+
+
+    kmeans = KMeans(n_clusters=7, random_state=0).fit(normalized_features)
     cluster_labels = kmeans.labels_
     print(cluster_labels.shape) #shape is 7138,
     print(GT.shape)
@@ -220,8 +288,8 @@ def main():
     print(f"Aligned Accuracy: {accuracy}")
 
 
-
-
+# Unique features: [[-3.9007525e-40  1.0889989e-38 -1.8682532e-40 -2.3100405e-40
+#   -2.1018636e-40  6.3795996e-38 -5.3876983e-40]] ! SO SMALL WHAT
     
 if __name__ == "__main__":
     main()
