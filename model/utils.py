@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
-
+from sklearn.metrics import confusion_matrix
+from scipy.optimize import linear_sum_assignment
 
 def loadHSI(data_path, ground_truth_path, data_col, ground_truth_col):
   """
@@ -48,3 +49,13 @@ def loadHSI(data_path, ground_truth_path, data_col, ground_truth_col):
 
 
 
+def calculate_aligned_accuracy(ground_truth, cluster_labels):
+    true_labels = ground_truth.flatten()
+    cm = confusion_matrix(true_labels, cluster_labels)
+    row_ind, col_ind = linear_sum_assignment(-cm)
+    label_mapping = {col_ind[i]: row_ind[i] for i in range(len(row_ind))}
+    aligned_labels = np.array([label_mapping[label] for label in cluster_labels])
+
+    accuracy = np.mean(aligned_labels == true_labels)
+
+    return accuracy
