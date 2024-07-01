@@ -7,30 +7,30 @@ from torch.utils.data import DataLoader, TensorDataset
 from PIL import Image
 import os
 from sklearn.preprocessing import StandardScaler
-
+import matplotlib.pyplot as plt
 class SimpleAutoencoder(nn.Module):
+
     def __init__(self):
         super(SimpleAutoencoder, self).__init__()
         # Encoder
-        self.encoder_fc1 = nn.Linear(1, 256)
-        self.bn_fc1 = nn.BatchNorm1d(256)
-        self.encoder_fc2 = nn.Linear(256, 128)
-        self.bn_fc2 = nn.BatchNorm1d(128)
-        self.encoder_fc3 = nn.Linear(128, 64)
-        self.bn_fc3 = nn.BatchNorm1d(64)
-        self.encoder_fc4 = nn.Linear(64, 7)
-        self.bn_fc4 = nn.BatchNorm1d(7)
+        self.conv1 = nn.Conv2d(in_channels=204, out_channels=128, kernel_size=1, stride=1, padding=0)
+        self.bn1 = nn.BatchNorm2d(128)
+        self.conv2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=1, stride=1, padding=0)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=1, stride=1, padding=0)
+        self.bn3 = nn.BatchNorm2d(32)
+        self.encoder_fc1 = nn.Linear(32, 7)
         self.relu = nn.LeakyReLU()
 
         # Decoder
-        self.decoder_fc1 = nn.Linear(7, 64)
-        self.bn_fc5 = nn.BatchNorm1d(64)
-        self.decoder_fc2 = nn.Linear(64, 128)
-        self.bn_fc6 = nn.BatchNorm1d(128)
-        self.decoder_fc3 = nn.Linear(128, 256)
-        self.bn_fc7 = nn.BatchNorm1d(256)
-        self.decoder_fc4 = nn.Linear(256, 1)
-        self.bn_fc8 = nn.BatchNorm1d(1)
+        self.decoder_fc1 = nn.Linear(7, 32)
+        self.bn_fc6 = nn.BatchNorm1d(32)
+        self.deconv3 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=1, stride=1, padding=0)
+        self.bn4 = nn.BatchNorm2d(64)
+        self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=128, kernel_size=1, stride=1, padding=0)
+        self.bn5 = nn.BatchNorm2d(128)
+        self.deconv1 = nn.ConvTranspose2d(in_channels=128, out_channels=204, kernel_size=1, stride=1, padding=0)
+        self.bn6 = nn.BatchNorm2d(204)
         
         self._initialize_weights()
 
@@ -47,37 +47,54 @@ class SimpleAutoencoder(nn.Module):
 
     def forward(self, x):
         # Encoder
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.conv2(x)
+
+        x = self.bn2(x)
+        x = self.relu(x)
+        x = self.conv3(x)
+
+        x = self.bn3(x)
+        x = self.relu(x)
+        x = x.view(x.size(0), -1)
         x = self.encoder_fc1(x)
-        x = self.bn_fc1(x)
-        x = self.relu(x)
-        x = self.encoder_fc2(x)
-        x = self.bn_fc2(x)
-        x = self.relu(x)
-        x = self.encoder_fc3(x)
-        x = self.bn_fc3(x)
-        x = self.relu(x)
-        x = self.encoder_fc4(x)
-        encoded_features = self.bn_fc4(x)
-        encoded_features = self.relu(encoded_features)
+        # x = self.bn_fc1(x)
+        # x = self.relu(x)
+        # x = self.encoder_fc2(x)
+        # x = self.bn_fc2(x)
+        # x = self.relu(x)
+        # x = self.encoder_fc3(x)
+        # x = self.bn_fc3(x)
+        encoded_features = self.relu(x)
+
 
         # Decoder
         x = self.decoder_fc1(encoded_features)
-        x = self.bn_fc5(x)
-        x = self.relu(x)
-        x = self.decoder_fc2(x)
+        # x = self.bn_fc4(x)
+        # x = self.relu(x)
+        # x = self.decoder_fc2(x)
+        # x = self.bn_fc5(x)
+        # x = self.relu(x)
+        # x = self.decoder_fc3(x)
         x = self.bn_fc6(x)
         x = self.relu(x)
-        x = self.decoder_fc3(x)
-        x = self.bn_fc7(x)
+        x = x.view(x.size(0), 32, 1, 1)
+        x = self.deconv3(x)
+        x = self.bn4(x)
         x = self.relu(x)
-        x = self.decoder_fc4(x)
-        x = self.bn_fc8(x)
+        x = self.deconv2(x)
+        x = self.bn5(x)
+        x = self.relu(x)
+        x = self.deconv1(x)
+        x = self.bn6(x)
         x = self.relu(x)
 
         return x, encoded_features
 
 def save_original_hsi_as_image(hsi, save_path):
-    
+
     hsi_min = hsi.min(axis=(0, 1), keepdims=True)
     hsi_max = hsi.max(axis=(0, 1), keepdims=True)
     hsi_normalized = (hsi - hsi_min) / (hsi_max - hsi_min)
@@ -89,9 +106,7 @@ def save_original_hsi_as_image(hsi, save_path):
 
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)
-
     img.save(save_path)
-    print(f"Original HSI image saved as RGB at: {save_path}")
 
 
 def extract_patches(hsi, patch_size):
@@ -105,38 +120,24 @@ def extract_patches(hsi, patch_size):
     return np.array(patches)
 
 def reassemble_image(patches, M, N, patch_size):
-    reconstructed_image = np.zeros((M, N, 204))
-    patch_count = np.zeros((M, N, 204))
-
+    reconstructed_image = np.zeros((M, N, patches.shape[1]))  # Adjusted to use patches.shape[1] for the channel dimension
     idx = 0
     for i in range(M):
         for j in range(N):
-            patch = patches[idx].transpose(1, 2, 0)  # Transpose to (height, width, channels)
-            i_start = i
-            i_end = i + 1
-            j_start = j
-            j_end = j + 1
-            reconstructed_image[i_start:i_end, j_start:j_end, :] += patch[patch_size//2:patch_size//2+1, patch_size//2:patch_size//2+1, :]
-            patch_count[i_start:i_end, j_start:j_end, :] += 1
+            patch = patches[idx].transpose(1, 2, 0)  # Match visualization function
+            patch = (patch - patch.min()) / (patch.max() - patch.min())  # Normalize each patch
+            reconstructed_image[i, j, :] = patch  # Directly assign the patch values to the corresponding pixel
             idx += 1
-
-    reconstructed_image /= np.maximum(patch_count, 1) 
-
     return reconstructed_image
 
 
 def tensor_to_image(tensor):
     tensor = tensor.squeeze()  
     
-    print(f"Tensor shape: {tensor.shape}")
-    print(f"Tensor min: {tensor.min()}, Tensor max: {tensor.max()}")
-    
     tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min()) 
     tensor = (tensor * 255).to(torch.uint8)  
     
     tensor = tensor.cpu().numpy()
-
-    # print(f"Converted tensor min: {tensor.min()}, Converted tensor max: {tensor.max()}")
     
     if tensor.ndim == 2:  # Grayscale image
         return Image.fromarray(tensor, mode='L')
@@ -150,6 +151,22 @@ def tensor_to_image(tensor):
         raise ValueError("Unexpected tensor shape for image conversion")
 
 
+def visualize_reconstructed_patches(patches, num_patches=25):
+    fig, axs = plt.subplots(1, num_patches, figsize=(15, 5))
+    for i in range(num_patches):
+        patch = patches[i].transpose(1, 2, 0)
+        patch = (patch - patch.min()) / (patch.max() - patch.min())  # Normalize to [0, 1]
+        axs[i].imshow(patch[:, :, :3])
+        axs[i].axis('off')
+    plt.show()
+
+def visualize_reassembled_image(image):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    image = (image - image.min()) / (image.max() - image.min())  # Normalize to [0, 1]
+    rgb_image = image[:, :, :3]
+    ax.imshow(rgb_image)
+    ax.axis('off')
+    plt.show()
 
 def main():      
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
@@ -176,21 +193,13 @@ def main():
 
     labels = torch.from_numpy(GT).long().flatten()  # Shape: (M*N,)
     dataset = TensorDataset(patches)
-    #dataset size is 7138, as expected
-    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
-
-    # for i, (inputs,) in enumerate(dataloader):
-    #     print(f"Batch {i} shape: {inputs.shape}")
-    #     if i == 2:  # Check first few batches
-    #         break
-    # #in dataloader, the bathces shapes are [16,204,1,1], as expected
-
+    dataloader = DataLoader(dataset, batch_size=14, shuffle=True)
     model = SimpleAutoencoder()
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
     
-    num_epochs = 5
+    num_epochs = 15
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -222,52 +231,34 @@ def main():
             reconstructed_patches.append(reconstructed.cpu().numpy())
             feature_list.append(features.cpu().numpy())
             
-        average_loss = total_loss / len(dataloader)
-        print(f"Average Reconstruction Loss: {average_loss}")
-        reconstructed_patches = np.concatenate(reconstructed_patches, axis = 0)
-        reconstructed_image = reassemble_image(reconstructed_patches, M, N, patch_size)
-        img = tensor_to_image(torch.tensor(reconstructed_image))
+    average_loss = total_loss / len(dataloader)
+    print(f"Average Reconstruction Loss: {average_loss}")
+    print(f"Sample reconstructed patches: {reconstructed_patches[:5]}")
+    reconstructed_patches = np.concatenate(reconstructed_patches, axis = 0)
+    visualize_reconstructed_patches(reconstructed_patches)
 
-        save_path = "/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed/img.png" 
-        directory = os.path.dirname(save_path)
-        
-        os.makedirs(directory, exist_ok=True)  
-        
-        if os.path.isdir(save_path):
-            raise IsADirectoryError(f"Save path '{save_path}' is a directory. Please provide a valid file path.")
-        img.save(save_path)
+    reconstructed_image = reassemble_image(reconstructed_patches, M, N, patch_size)
     
-            
+    visualize_reassembled_image(reconstructed_image)
+
+    
     feature_list = np.vstack(feature_list) 
-    # print(f"Extracted features shape: {feature_list.shape}")#shape is? 7138,7
 
-    scaling_factor = 1e15
-    scaled_features = feature_list * scaling_factor
-    print(f"Scaled features sample: {scaled_features[:5]}")
-
-
-    # Normalize features using StandardScaler? turns everything to 0 rn, values too small.. scaling cactor should be greater?
     scaler = StandardScaler()
-    normalized_features = scaler.fit_transform(scaled_features)
-    print(f"Normalized features sample: {normalized_features[:5]}")
-
-    
-    unique_features = np.unique(normalized_features, axis=0)
-    print(f"Number of unique features: {normalized_features.shape[0]}")
-    print(f"Unique features: {normalized_features}")
-
+    normalized_features = scaler.fit_transform(feature_list)
 
     kmeans = KMeans(n_clusters=7, random_state=0).fit(normalized_features)
     cluster_labels = kmeans.labels_
-    print(cluster_labels.shape) #shape is 7138,
-    print(GT.shape)
+
+
+
+
+    unique_clusters = np.unique(cluster_labels)
+    print(f"Number of unique clusters: {len(unique_clusters)}")
+    print(f"Unique clusters: {unique_clusters}")
 
     accuracy = calculate_aligned_accuracy(GT, cluster_labels)
     print(f"Aligned Accuracy: {accuracy}")
 
-
-# Unique features: [[-3.9007525e-40  1.0889989e-38 -1.8682532e-40 -2.3100405e-40
-#   -2.1018636e-40  6.3795996e-38 -5.3876983e-40]] ! SO SMALL WHAT
-    
 if __name__ == "__main__":
     main()

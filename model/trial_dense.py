@@ -7,6 +7,7 @@ import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from PIL import Image
 import os
+import matplotlib.pyplot as plt
 
 class FullyConnectedAutoencoder(nn.Module):
     def __init__(self):
@@ -98,12 +99,15 @@ def extract_patches(hsi, patch_size):
     return np.array(patches)
 
 def reassemble_image(patches, M, N, patch_size):
+    print(M)
+    print(N)
     reconstructed_image = np.zeros((M, N, 204))
     patch_count = np.zeros((M, N, 204))
 
     idx = 0
     for i in range(M):
         for j in range(N):
+            print(patches[idx].shape)
             patch = patches[idx].transpose(1, 2, 0)  # Transpose to (height, width, channels)
             i_start = i
             i_end = i + 1
@@ -137,6 +141,14 @@ def tensor_to_image(tensor):
         return Image.fromarray(rgb_image, mode='RGB')
     else:
         raise ValueError("Unexpected tensor shape for image conversion")
+    
+def visualize_reassembled_image(image):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    image = (image - image.min()) / (image.max() - image.min())  # Normalize to [0, 1]
+    rgb_image = image[:, :, :3]
+    ax.imshow(rgb_image)
+    ax.axis('off')
+    plt.show()
 
 def main():
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
@@ -172,7 +184,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-    num_epochs = 10
+    num_epochs = 25
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -219,32 +231,32 @@ def main():
     feature_list = np.vstack(feature_list)
     print(f"Extracted features shape: {feature_list.shape}")
 
-    # Scale features by a large constant
-    scaling_factor = 1e10
-    scaled_features = feature_list * scaling_factor
-    print(f"Scaled features sample: {scaled_features[:5]}")
+    # # Scale features by a large constant
+    # print(reconstructed_patches.shape)
 
-    # Normalize features using StandardScaler
+    # reconstructed_patches = np.concatenate(reconstructed_patches, axis = 0)
+
+    # reconstructed_image = reassemble_image(reconstructed_patches, M, N, patch_size)
+    
+    # visualize_reassembled_image(reconstructed_image)
+
+    
+    feature_list = np.vstack(feature_list) 
+
     scaler = StandardScaler()
-    normalized_features = scaler.fit_transform(scaled_features)
-    print(f"Normalized features sample: {normalized_features[:5]}")
+    normalized_features = scaler.fit_transform(feature_list)
 
-    # Check for unique features
-    unique_features = np.unique(normalized_features, axis=0)
-    print(f"Number of unique features: {unique_features.shape[0]}")
-    print(f"Unique features: {unique_features}")
-
-    # Fit KMeans and check cluster labels shape
     kmeans = KMeans(n_clusters=7, random_state=0).fit(normalized_features)
     cluster_labels = kmeans.labels_
-    print(f"Cluster labels shape: {cluster_labels.shape}")  # Should be (7138,)
-    print(f"GT shape: {GT.shape}")  # Should be (7138,)
 
-    # Ensure the cluster labels match the ground truth shape
-    cluster_labels = cluster_labels.reshape(M, N)
-    print(f"Reshaped cluster labels shape: {cluster_labels.shape}")
 
-    accuracy = calculate_aligned_accuracy(GT, cluster_labels.flatten())
+
+
+    unique_clusters = np.unique(cluster_labels)
+    print(f"Number of unique clusters: {len(unique_clusters)}")
+    print(f"Unique clusters: {unique_clusters}")
+
+    accuracy = calculate_aligned_accuracy(GT, cluster_labels)
     print(f"Aligned Accuracy: {accuracy}")
 
 if __name__ == "__main__":
