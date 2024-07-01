@@ -12,25 +12,56 @@ class SimpleAutoencoder(nn.Module):
 
     def __init__(self):
         super(SimpleAutoencoder, self).__init__()
-        # Encoder
-        self.conv1 = nn.Conv2d(in_channels=204, out_channels=128, kernel_size=1, stride=1, padding=0)
-        self.bn1 = nn.BatchNorm2d(128)
-        self.conv2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=1, stride=1, padding=0)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=1, stride=1, padding=0)
-        self.bn3 = nn.BatchNorm2d(32)
-        self.encoder_fc1 = nn.Linear(32, 7)
-        self.relu = nn.LeakyReLU()
-
+        self.encoder = nn.Sequential(
+            nn.Conv2d(204, 128, kernel_size=1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(),
+            nn.Conv2d(128, 64, kernel_size=1),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(),
+            nn.Conv2d(64, 32, kernel_size=1),
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(),
+            nn.Flatten(),
+            nn.Linear(32, 7),
+            nn.BatchNorm1d(7),  # Use BatchNorm1d for linear layers
+            nn.LeakyReLU()
+        )
         # Decoder
-        self.decoder_fc1 = nn.Linear(7, 32)
-        self.bn_fc6 = nn.BatchNorm1d(32)
-        self.deconv3 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=1, stride=1, padding=0)
-        self.bn4 = nn.BatchNorm2d(64)
-        self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=128, kernel_size=1, stride=1, padding=0)
-        self.bn5 = nn.BatchNorm2d(128)
-        self.deconv1 = nn.ConvTranspose2d(in_channels=128, out_channels=204, kernel_size=1, stride=1, padding=0)
-        self.bn6 = nn.BatchNorm2d(204)
+        self.decoder = nn.Sequential(
+            nn.Linear(7, 32),
+            nn.BatchNorm1d(32),  # Use BatchNorm1d for linear layers
+            nn.LeakyReLU(),
+            nn.Unflatten(1, (32, 1, 1)),
+            nn.ConvTranspose2d(32, 64, kernel_size=1),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(),
+            nn.ConvTranspose2d(64, 128, kernel_size=1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(),
+            nn.ConvTranspose2d(128, 204, kernel_size=1),
+            nn.BatchNorm2d(204),
+            nn.LeakyReLU()
+        )
+        # # Encoder
+        # self.conv1 = nn.Conv2d(in_channels=204, out_channels=128, kernel_size=1, stride=1, padding=0)
+        # self.bn1 = nn.BatchNorm2d(128)
+        # self.conv2 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=1, stride=1, padding=0)
+        # self.bn2 = nn.BatchNorm2d(64)
+        # self.conv3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=1, stride=1, padding=0)
+        # self.bn3 = nn.BatchNorm2d(32)
+        # self.encoder_fc1 = nn.Linear(32, 7)
+        # self.relu = nn.LeakyReLU()
+
+        # # Decoder
+        # self.decoder_fc1 = nn.Linear(7, 32)
+        # self.bn_fc6 = nn.BatchNorm1d(32)
+        # self.deconv3 = nn.ConvTranspose2d(in_channels=32, out_channels=64, kernel_size=1, stride=1, padding=0)
+        # self.bn4 = nn.BatchNorm2d(64)
+        # self.deconv2 = nn.ConvTranspose2d(in_channels=64, out_channels=128, kernel_size=1, stride=1, padding=0)
+        # self.bn5 = nn.BatchNorm2d(128)
+        # self.deconv1 = nn.ConvTranspose2d(in_channels=128, out_channels=204, kernel_size=1, stride=1, padding=0)
+        # self.bn6 = nn.BatchNorm2d(204)
         
         self._initialize_weights()
 
@@ -46,52 +77,9 @@ class SimpleAutoencoder(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        # Encoder
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.conv2(x)
-
-        x = self.bn2(x)
-        x = self.relu(x)
-        x = self.conv3(x)
-
-        x = self.bn3(x)
-        x = self.relu(x)
-        x = x.view(x.size(0), -1)
-        x = self.encoder_fc1(x)
-        # x = self.bn_fc1(x)
-        # x = self.relu(x)
-        # x = self.encoder_fc2(x)
-        # x = self.bn_fc2(x)
-        # x = self.relu(x)
-        # x = self.encoder_fc3(x)
-        # x = self.bn_fc3(x)
-        encoded_features = self.relu(x)
-
-
-        # Decoder
-        x = self.decoder_fc1(encoded_features)
-        # x = self.bn_fc4(x)
-        # x = self.relu(x)
-        # x = self.decoder_fc2(x)
-        # x = self.bn_fc5(x)
-        # x = self.relu(x)
-        # x = self.decoder_fc3(x)
-        x = self.bn_fc6(x)
-        x = self.relu(x)
-        x = x.view(x.size(0), 32, 1, 1)
-        x = self.deconv3(x)
-        x = self.bn4(x)
-        x = self.relu(x)
-        x = self.deconv2(x)
-        x = self.bn5(x)
-        x = self.relu(x)
-        x = self.deconv1(x)
-        x = self.bn6(x)
-        x = self.relu(x)
-
-        return x, encoded_features
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded, encoded
 
 def save_original_hsi_as_image(hsi, save_path):
 
@@ -172,8 +160,12 @@ def main():
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
     salinasA_gt_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_gt.mat'
     X, M, N, D, HSI, GT, Y, n, K = loadHSI(salinasA_path, salinasA_gt_path, 'salinasA_corrected', 'salinasA_gt')
+    print(f"Original labels sample: {GT[:10]}")  # Print first 10 labels
+
     
     GT = GT - 1  # Convert to 0-based indexing.. necessary
+    print(f"Converted labels sample: {GT[:10]}")  # Print first 10 converted labels
+
     HSI = X.reshape((M, N, D))  
     save_path = "/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/reconstructed/orginal_img.png" 
     directory = os.path.dirname(save_path)
