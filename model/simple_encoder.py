@@ -77,8 +77,13 @@ class SimpleAutoencoder(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
+        print(f'input shape is {x.shape}')
+
         encoded = self.encoder(x)
+        print(f'encoded shape shape is {encoded.shape}')
+
         decoded = self.decoder(encoded)
+        print(f'decoded shape is {decoded.shape}')
         return decoded, encoded
 
 def save_original_hsi_as_image(hsi, save_path):
