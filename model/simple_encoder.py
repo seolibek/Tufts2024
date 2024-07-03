@@ -44,17 +44,22 @@ class SimpleAutoencoder(nn.Module):
             nn.ConvTranspose2d(128, 204, kernel_size=1),
             nn.Sigmoid()
         )
-        self._initialize_weights()
+        self._initialize_weights(mode = 'xavier')
 
-    def _initialize_weights(self):
-        # Initialize weights to avoid extremely small values
+    def _initialize_weights(self, mode):
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                if mode == 'kaiming':
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                elif mode == 'xavier':
+                    nn.init.xavier_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                if mode == 'kaiming':
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                elif mode == 'xavier':
+                    nn.init.xavier_normal_(m.weight)
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
