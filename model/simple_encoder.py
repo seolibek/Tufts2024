@@ -6,15 +6,16 @@ import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from PIL import Image
 import os
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
 class SimpleAutoencoder(nn.Module):
     def __init__(self):
         super(SimpleAutoencoder, self).__init__()
         self.encoder = nn.Sequential(
             nn.Conv2d(204, 128, kernel_size=1),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.BatchNorm2d(128),
             nn.Dropout(0.3),
             nn.Conv2d(128, 64, kernel_size=1),
@@ -22,29 +23,26 @@ class SimpleAutoencoder(nn.Module):
             nn.BatchNorm2d(64),
             nn.Dropout(0.3),
             nn.Conv2d(64, 32, kernel_size=1),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.BatchNorm2d(32),
+            # nn.Conv2d(32,16,kernel_size=1),
             nn.Flatten(),
             nn.Linear(32, 7),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(7),
-            nn.Dropout(0.3)
-        )
+            nn.Sigmoid()
+            )
         self.decoder = nn.Sequential(
             nn.Linear(7, 32),
-            nn.LeakyReLU(),
-            nn.BatchNorm1d(32),
-            nn.Dropout(0.3),
+            nn.Sigmoid(),
             nn.Unflatten(1, (32, 1, 1)),
+            # nn.ConvTranspose2d(16,32,kernel_size = 1),
             nn.ConvTranspose2d(32, 64, kernel_size=1),
             nn.LeakyReLU(),
             nn.BatchNorm2d(64),
             nn.ConvTranspose2d(64, 128, kernel_size=1),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.BatchNorm2d(128),
             nn.ConvTranspose2d(128, 204, kernel_size=1),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(204)
+            nn.Sigmoid()
         )
         self._initialize_weights()
 
@@ -119,18 +117,39 @@ def visualize_bands(original_image, reconstructed_image, num_bands=204):
         axs[1, i].axis('off')
     plt.show()
 
-def visualize_intermediate(encoded, decoded, original, num_samples=10):
-    fig, axs = plt.subplots(3, num_samples, figsize=(num_samples * 2, 6))
+def visualize_intermediate(original, decoded, num_samples=2, num_bands=5, num_pixels=14):
+    print("Original shape:", original.shape)
+    print("Decoded shape:", decoded.shape)
+
+    num_bands = min(num_bands, original.shape[1])
+    num_samples = min(num_samples, original.shape[0])
+
+    fig, axs = plt.subplots(num_bands, num_samples * 2, figsize=(num_samples * 5, num_bands * 5))
     for i in range(num_samples):
-        orig_sample = original[i, :].reshape(1, -1)
-        enc_sample = encoded[i, :].reshape(1, -1)
-        dec_sample = decoded[i, :].reshape(1, -1)
-        axs[0, i].imshow(orig_sample, cmap='gray', aspect='auto')
-        axs[0, i].axis('off')
-        axs[1, i].imshow(enc_sample, cmap='gray', aspect='auto')
-        axs[1, i].axis('off')
-        axs[2, i].imshow(dec_sample, cmap='gray', aspect='auto')
-        axs[2, i].axis('off')
+        for j in range(num_bands):
+            orig_band = original[i, j, :, :].reshape(1, 1)
+            dec_band = decoded[i, j, :, :].reshape(1, 1)
+
+            orig_band_normalized = (orig_band - orig_band.min()) / (orig_band.max() - orig_band.min() + 1e-8)
+            dec_band_normalized = (dec_band - dec_band.min()) / (dec_band.max() - dec_band.min() + 1e-8)
+
+            print(f"Original Band {j+1} Sample {i+1} min-max:", orig_band.min(), orig_band.max())
+            print(f"Decoded Band {j+1} Sample {i+1} min-max:", dec_band.min(), dec_band.max())
+
+            axs[j, i * 2].imshow(orig_band_normalized, cmap='gray', aspect='auto')
+            axs[j, i * 2].set_title(f"Original Band {j+1}")
+            axs[j, i * 2].axis('off')
+            axs[j, i * 2 + 1].imshow(dec_band_normalized, cmap='gray', aspect='auto')
+            axs[j, i * 2 + 1].set_title(f"Reconstructed Band {j+1}")
+            axs[j, i * 2 + 1].axis('off')
+    plt.tight_layout()
+    plt.show()
+
+def visualize_encoded(encoded):
+    encoded_2d = TSNE(n_components=2).fit_transform(encoded)
+    plt.figure(figsize=(8, 8))
+    plt.scatter(encoded_2d[:, 0], encoded_2d[:, 1], s=5)
+    plt.title('t-SNE visualization of encoded features')
     plt.show()
 
 def main():      
@@ -143,22 +162,19 @@ def main():
 
     HSI = X.reshape((M, N, D))  
 
-    patch_size = 1
-    patches = extract_patches(HSI, patch_size)
-    print(f"Extracted patches shape: {patches.shape}") #(7138,1,1,204)
+    scaler = MinMaxScaler()
+    HSI = scaler.fit_transform(HSI.reshape(-1, D)).reshape(M, N, D)
 
-    patches = torch.from_numpy(patches).float().permute(0, 3, 1, 2)  # Shape: (num_patches, D, patch_size, patch_size) -> (7138,204,1,1)
-    print(f"Patches permuted for input: {patches.shape}")
+    pixels = HSI.reshape(-1, D, 1, 1)
+    pixels = torch.from_numpy(pixels).float()
 
-    labels = torch.from_numpy(GT).long().flatten()  # Shape: (M*N,)
-    dataset = TensorDataset(patches)
-    dataloader = DataLoader(dataset, batch_size=14, shuffle=True)
+    dataset = TensorDataset(pixels)
+    dataloader = DataLoader(dataset, batch_size=256, shuffle=False)
     model = SimpleAutoencoder()
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-    
-    num_epochs = 20
+    criterion = nn.BCELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)
+#node lr 0.0004 and less complex without the 16 works okay like 58 percent.. should i just fw that
+    num_epochs = 28
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -166,72 +182,42 @@ def main():
             inputs = inputs[0]
             optimizer.zero_grad()
             reconstructed, encoded = model(inputs)
-            loss = criterion(reconstructed, inputs)  
+            loss = criterion(reconstructed, inputs)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        scheduler.step()
         print(f"Epoch {epoch+1}, Loss: {running_loss/len(dataloader)}")
 
-         # Visualize intermediate outputs
-        if (epoch + 1) % 10 == 0:
-            with torch.no_grad():
-                inputs = next(iter(dataloader))[0]
-                reconstructed, encoded = model(inputs)
-                visualize_intermediate(encoded.view(-1, encoded.size(1)).cpu().numpy(), reconstructed.view(-1, reconstructed.size(1)).cpu().numpy(), inputs.view(-1, inputs.size(1)).cpu().numpy())
 
-
-    
     model.eval()
     total_loss = 0.0
-    reconstructed_patches = []
-    feature_list = []
+    reconstructed_pixels = []
+    encoded_features = []
 
     with torch.no_grad():
         for batch in dataloader:
-            inputs = batch[0]  
-            reconstructed, features = model(inputs)
+            inputs = batch[0]
+            reconstructed, encoded = model(inputs)
             loss = criterion(reconstructed, inputs)
             total_loss += loss.item()
-            reconstructed_patches.append(reconstructed.cpu().numpy())
-            feature_list.append(features.cpu().numpy())
-            
+            reconstructed_pixels.append(reconstructed.cpu().numpy())
+            encoded_features.append(encoded.cpu().numpy())
+
     average_loss = total_loss / len(dataloader)
     print(f"Average Reconstruction Loss: {average_loss}")
 
-    reconstructed_patches = np.concatenate(reconstructed_patches, axis = 0)
-    reconstructed_image = reassemble_image(reconstructed_patches, M, N, patch_size)
-    visualize_bands(HSI, reconstructed_image)
-    feature_list = np.vstack(feature_list) 
+    encoded_features = np.concatenate(encoded_features, axis=0).reshape(-1, 7)  
+    # visualize_encoded(encoded_features)
 
-    scaler = StandardScaler()
-    normalized_features = scaler.fit_transform(feature_list)
-
-    kmeans = KMeans(n_clusters=7, random_state=0).fit(normalized_features)
-    dbscan = DBSCAN(eps=0.5, min_samples=5).fit(normalized_features)
-    agglo = AgglomerativeClustering(n_clusters=7).fit(normalized_features)
-
-    # Evaluate clustering performance
-    kmeans_labels = kmeans.labels_
-    dbscan_labels = dbscan.labels_
-    agglo_labels = agglo.labels_
-
+    # Clustering
+    kmeans = KMeans(n_clusters=7, random_state=0).fit(encoded_features)
     print("KMeans Clustering Performance:")
+    kmeans_labels = kmeans.labels_
+    unique_clusters = np.unique(kmeans_labels)
+    print(f"Number of unique clusters: {len(unique_clusters)}")
+    print(f"Unique clusters: {unique_clusters}")
     kmeans_accuracy = calculate_aligned_accuracy(GT.flatten(), kmeans_labels)
     print(f"Aligned Accuracy: {kmeans_accuracy}")
-
-    print("DBSCAN Clustering Performance:")
-    dbscan_accuracy = calculate_aligned_accuracy(GT.flatten(), dbscan_labels)
-    print(f"Aligned Accuracy: {dbscan_accuracy}")
-
-    print("Agglomerative Clustering Performance:")
-    agglo_accuracy = calculate_aligned_accuracy(GT.flatten(), agglo_labels)
-    print(f"Aligned Accuracy: {agglo_accuracy}")
-
-    reconstructed_pixels = np.concatenate(reconstructed_pixels, axis=0)
-    reconstructed_image = reassemble_image(reconstructed_pixels.reshape(-1, D), M, N)
-    reconstructed_image = scaler.inverse_transform(reconstructed_image.reshape(-1, D)).reshape(M, N, D)
-    visualize_bands(HSI, reconstructed_image)
 
 
 if __name__ == "__main__":
