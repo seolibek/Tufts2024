@@ -25,7 +25,6 @@ class SimpleAutoencoder(nn.Module):
             nn.Conv2d(64, 32, kernel_size=1),
             nn.ReLU(),
             nn.BatchNorm2d(32),
-            # nn.Conv2d(32,16,kernel_size=1),
             nn.Flatten(),
             nn.Linear(32, 7),
             nn.Sigmoid()
@@ -34,7 +33,6 @@ class SimpleAutoencoder(nn.Module):
             nn.Linear(7, 32),
             nn.Sigmoid(),
             nn.Unflatten(1, (32, 1, 1)),
-            # nn.ConvTranspose2d(16,32,kernel_size = 1),
             nn.ConvTranspose2d(32, 64, kernel_size=1),
             nn.LeakyReLU(),
             nn.BatchNorm2d(64),
@@ -90,25 +88,6 @@ def reassemble_image(patches, M, N, patch_size):
     return reconstructed_image
 
 
-def tensor_to_image(tensor):
-    tensor = tensor.squeeze()  
-    
-    tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min()) 
-    tensor = (tensor * 255).to(torch.uint8)  
-    
-    tensor = tensor.cpu().numpy()
-    
-    if tensor.ndim == 2:  # Grayscale image
-        return Image.fromarray(tensor, mode='L')
-    elif tensor.ndim == 3 and tensor.shape[2] == 3:  # RGB image
-        return Image.fromarray(tensor, mode='RGB')
-    elif tensor.ndim == 3 and tensor.shape[2] == 204:  # Hyperspectral image, need to reduce dimensions
-        # Example: Convert to RGB by taking the first three channels
-        rgb_image = tensor[:, :, :3]
-        return Image.fromarray(rgb_image, mode='RGB')
-    else:
-        raise ValueError("Unexpected tensor shape for image conversion")
-
 def visualize_bands(original_image, reconstructed_image, num_bands=204):
     fig, axs = plt.subplots(2, num_bands, figsize=(num_bands * 2, 4))
     for i in range(num_bands):
@@ -157,6 +136,8 @@ def visualize_encoded(encoded):
     plt.title('t-SNE visualization of encoded features')
     plt.show()
 
+
+
 def main():      
     salinasA_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_corrected.mat'
     salinasA_gt_path = '/Users/seoli/Desktop/DIAMONDS/Tufts2024/data/SalinasA_gt.mat'
@@ -177,9 +158,8 @@ def main():
     dataloader = DataLoader(dataset, batch_size=256, shuffle=False)
     model = SimpleAutoencoder()
     criterion = nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)
-#node lr 0.0004 and less complex without the 16 works okay like 58 percent.. should i just fw that
-    num_epochs = 28
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001253003, weight_decay=1e-5)
+    num_epochs = 25
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
