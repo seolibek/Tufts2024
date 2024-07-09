@@ -235,6 +235,8 @@ def train_model(params):
     model = train_autoencoder(model,dataloader,criterion,optimizer)
     encoded_features = evaluate_autoencoder(model,dataloader,criterion)
     cluster_and_evaluate(encoded_features,GT,num_unique_clusters)
+    print(f"Number of parameters: {count_parameters(model)}")
+
 
 def main():
     space = {
@@ -251,5 +253,8 @@ def main():
                 trials=trials)
 
     print("Best parameters: %s" % best)
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 if __name__ == "__main__":
     main()
