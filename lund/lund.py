@@ -25,7 +25,7 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     DiffusionMap = np.zeros_like(G['EigenVecs'])
     #iterating over columns?? i think matlab is indexed from 1
     for l in range(DiffusionMap.shape[1]):
-        DiffusionMap[:, l] = np.multiply(G['EigenVecs'][:, l],(np.power(G['EigenVals'][l],t)))
+        DiffusionMap[:, l] = (G['EigenVecs'][:, l] * (np.power(G['EigenVals'][l],t)))
 
 
     # Calculate pairwise diffusion distance at time t between points in X
@@ -41,7 +41,7 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
 
     # Extract Dt(x) and sort in descending order
     #ignore . element wise operations handled in python.
-    Dt = np.multiply(rt, p)
+    Dt = rt * p
     m_sorting = np.argsort(-Dt) #sorting in descending order technically bc negative versions
 
     # Determine K based on the ratio of sorted Dt(x_{m_k})
