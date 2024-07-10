@@ -135,7 +135,7 @@ class DensityEstimator:
         if NN < n:
             p = np.divide(np.sum(np.exp(-(D[:NN + 1, :] ** 2),(sigma0 ** 2)), axis=0))
         else:
-            p = np.divide(np.sum(np.exp(-(D ** 2) / (sigma0 ** 2)), axis=0))
+            p = np.divide(np.sum(np.exp(-(D ** 2), (sigma0 ** 2)), axis=0))
 
         p = np.divide(p, np.sum(p))
         return p
