@@ -39,20 +39,14 @@ class GraphExtractor:
             #apparently there exists a more effecient way. fix later?
             D_sorted, sorting = np.sort(Dist[i, :])[:self.DiffusionNN+1], np.argsort(Dist[i, :])[:self.DiffusionNN+1]
 
+            #TODO: compare values with matlab code + see output for D_sorted , sorting (currently very off)
+
             W[i, sorting[1:]] = (np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2)))
             D[i, i] = np.sum(W[i, :])
-<<<<<<< Updated upstream
-            P[i, sorting[1:]] = (W[i, sorting[1:]] / D[i, i])
-
-        pi = (np.diag(D) / np.sum(np.diag(D)))
-=======
             P[i, sorting[1:]] = W[i, sorting[1:]] / D[i, i]
-            print('mink proper init')
+
+            #TODO: Checking all of these values...
         pi = np.diag(D) / np.sum(np.diag(D))
->>>>>>> Stashed changes
-
-
-
 
         #ok do the eigendecomp here..
         print('entering try')
@@ -134,27 +128,20 @@ class DensityEstimator:
 
         # Initialize 
         p = np.zeros(n)
-        print('bro what ')
         if D is None:
             D = pdist(X)
             D = squareform(D) #pairwise dist between points in X
             print('d is squareformed')
         D = np.sort(D, axis=0)
-        print('d is sorted')
+        print(D)
 
         if NN < n:
             print('pre sum)')
             p = np.sum(np.exp(-(D[:NN + 1, :] ** 2) / (sigma0 ** 2)), axis=0)
             print("Updated")
         else:
-<<<<<<< Updated upstream
             p = (np.sum(np.exp(-(D ** 2) / (sigma0 ** 2)), axis=0))
 
-        p = (p / np.sum(p))
-=======
-            print('pre sum')
-            p = np.sum(np.exp(-(D ** 2) / (sigma0 ** 2)), axis=0)
-        print('post sum')
+       
         p = p / np.sum(p)
->>>>>>> Stashed changes
         return p
