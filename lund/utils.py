@@ -26,6 +26,7 @@ class GraphExtractor:
         if Dist == None:
             Dist = pdist(X)
             Dist = squareform(Dist)
+            print('distance proper init')
         #not doing the sptial params stuff for now, see lines 51-105
         W = np.zeros((n,n))
         P = np.zeros((n,n))
@@ -40,19 +41,27 @@ class GraphExtractor:
 
             W[i, sorting[1:]] = (np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2)))
             D[i, i] = np.sum(W[i, :])
+<<<<<<< Updated upstream
             P[i, sorting[1:]] = (W[i, sorting[1:]] / D[i, i])
 
         pi = (np.diag(D) / np.sum(np.diag(D)))
+=======
+            P[i, sorting[1:]] = W[i, sorting[1:]] / D[i, i]
+            print('mink proper init')
+        pi = np.diag(D) / np.sum(np.diag(D))
+>>>>>>> Stashed changes
 
 
 
 
         #ok do the eigendecomp here..
+        print('entering try')
         try:
             if self.NEigs is not None:
                 #worry about implementing this later
                 pass
             else:
+                print('else condition of try executed')
                 eigvals, eigvecs = eigs(P, k=20) #scipy order is different (see docs if needed)
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
@@ -69,7 +78,7 @@ class GraphExtractor:
             # setting theoretical val for first eigenpair
             eigvecs[:, 0] = 1
             eigvals[0] = 1
-
+            print('sucessfully')
             #store in graph structure?
             graph = {
                 'Hyperparameters': {
@@ -125,18 +134,27 @@ class DensityEstimator:
 
         # Initialize 
         p = np.zeros(n)
-
+        print('bro what ')
         if D is None:
             D = pdist(X)
             D = squareform(D) #pairwise dist between points in X
-        
+            print('d is squareformed')
         D = np.sort(D, axis=0)
+        print('d is sorted')
 
         if NN < n:
+            print('pre sum)')
             p = np.sum(np.exp(-(D[:NN + 1, :] ** 2) / (sigma0 ** 2)), axis=0)
             print("Updated")
         else:
+<<<<<<< Updated upstream
             p = (np.sum(np.exp(-(D ** 2) / (sigma0 ** 2)), axis=0))
 
         p = (p / np.sum(p))
+=======
+            print('pre sum')
+            p = np.sum(np.exp(-(D ** 2) / (sigma0 ** 2)), axis=0)
+        print('post sum')
+        p = p / np.sum(p)
+>>>>>>> Stashed changes
         return p

@@ -22,8 +22,10 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     C = np.zeros(n, dtype=int)
 
     # Calculate diffusion map
+    print('entered lund')
     DiffusionMap = np.zeros_like(G['EigenVecs'])
     #iterating over columns?? i think matlab is indexed from 1
+    print('replicate error')
     for l in range(DiffusionMap.shape[1]):
         DiffusionMap[:, l] = (G['EigenVecs'][:, l] * (np.power(G['EigenVals'][l],t)))
 
