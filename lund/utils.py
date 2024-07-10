@@ -38,11 +38,11 @@ class GraphExtractor:
             #apparently there exists a more effecient way. fix later?
             D_sorted, sorting = np.sort(Dist[i, :])[:self.DiffusionNN+1], np.argsort(Dist[i, :])[:self.DiffusionNN+1]
 
-            W[i, sorting[1:]] = np.divide( np.exp(-(D_sorted[1:] ** 2),(self.sigma ** 2)))
+            W[i, sorting[1:]] = (np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2)))
             D[i, i] = np.sum(W[i, :])
-            P[i, sorting[1:]] = np.divide(W[i, sorting[1:]], D[i, i])
+            P[i, sorting[1:]] = (W[i, sorting[1:]] / D[i, i])
 
-        pi = np.divide(np.diag(D), np.sum(np.diag(D)))
+        pi = (np.diag(D) / np.sum(np.diag(D)))
 
 
 
@@ -133,9 +133,10 @@ class DensityEstimator:
         D = np.sort(D, axis=0)
 
         if NN < n:
-            p = np.divide(np.sum(np.exp(-(D[:NN + 1, :] ** 2),(sigma0 ** 2)), axis=0))
+            p = np.sum(np.exp(-(D[:NN + 1, :] ** 2) / (sigma0 ** 2)), axis=0)
+            print("Updated")
         else:
-            p = np.divide(np.sum(np.exp(-(D ** 2), (sigma0 ** 2)), axis=0))
+            p = (np.sum(np.exp(-(D ** 2) / (sigma0 ** 2)), axis=0))
 
-        p = np.divide(p, np.sum(p))
+        p = (p / np.sum(p))
         return p
