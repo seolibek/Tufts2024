@@ -30,7 +30,7 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
 
     # Extract Dt(x) and sort in descending order
     #ignore . element wise operations handled in python.
-    Dt = rt * p
+    Dt = np.multiply(rt * p)
     m_sorting = np.argsort(-Dt) #sorting in descending order technically bc negative versions
 
     # Determine K based on the ratio of sorted Dt(x_{m_k})
