@@ -7,6 +7,16 @@ from scipy.spatial.distance import pdist, squareform
 3.). Label using the LUND scheme.'''
 
 def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
+    '''
+    This functino produces a structure with multiscale clusterings produced with the LUND algorithm.
+    This code is a  python adaptation of the original code as published in 
+    https://github.com/sampolk/MultiscaleDiffusionClustering/
+
+    :param X: Data matrix
+    :param t: Diffusion Time step
+    :param G: Graph structure computed using extract_graph.py (also adapted from same repository)
+    :param p: Kernel Density Estimator
+    '''
     
     n = len(X)
     C = np.zeros(n, dtype=int)
@@ -37,14 +47,14 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     if K_known is not None: #nargin dne in python.
         K = K_known
     else:
-        ratios = Dt[m_sorting[:n-2]] / Dt[m_sorting[1:n-1]]
+        ratios = Dt[m_sorting[0:n-1]] / Dt[m_sorting[1:n]]
         K = np.argmax(ratios)
 
     if K == 1:
         C = np.ones(n, dtype=int)
     else:
         # Label modes
-        C[m_sorting[:K-1]] = np.arange(0, K - 1)
+        C[m_sorting[:K]] = np.arange(0, K)
 
         # Label non-modal points according to the label of their Dt-nearest
         # neighbor of higher density that is already labeled.

@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import kneighbors_graph
-from scipy.sparce.csgraph import laplacian
+from scipy.sparse.csgraph import laplacian
+from scipy.sparse.linalg import eigs
 #matlabafdsdlfdklfjdslkfjdljksfljkdslfkjdslf
 
 class GraphExtractor:
@@ -17,7 +18,7 @@ class GraphExtractor:
     '''
     def __init__(self, sigma, DiffusionNN, NEigs = None):
         self.sigma = sigma
-        self.NN = DiffusionNN
+        self.DiffusionNN = DiffusionNN
         self.NEigs = NEigs
 
     def extract_graph(self, X, Dist = None):
@@ -35,7 +36,7 @@ class GraphExtractor:
             #rewritten in python .. sort should sort the distances and argsort should return the indices.
 
             #apparently there exists a more effecient way. fix later?
-            D_sorted, sorting = np.sort(Dist[i, :])[:self.NN+1], np.argsort(Dist[i, :])[:self.NNNN+1]
+            D_sorted, sorting = np.sort(Dist[i, :])[:self.DiffusionNN+1], np.argsort(Dist[i, :])[:self.DiffusionNN+1]
 
             W[i, sorting[1:]] = np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2))
             D[i, i] = np.sum(W[i, :])
@@ -47,7 +48,55 @@ class GraphExtractor:
 
 
         #ok do the eigendecomp here..
-        try????
+        try:
+            if self.NEigs is not None:
+                #worry about implementing this later
+                pass
+            else:
+                eigvals, eigvecs = eigs(P, k=20) #scipy order is different (see docs if needed)
+                eigvals = np.real(eigvals)
+                sorted_eigvals = np.sort(-np.abs(eigvals))
+                eiggap = np.abs(np.diff(sorted_eigvals))
+                n_eigs = np.argmax(eiggap) + 1 #python indexing is 0.
+                #"fringe cases"
+                if n_eigs < 5:
+                    n_eigs = 5
+            #again,,,,,  capabilities python j doesnt have.
+            idx = np.argsort(-np.abs(eigvals))
+            eigvals = eigvals[idx][:n_eigs]
+            eigvecs = eigvecs[:, idx][:n_eigs]
+            
+            # setting theoretical val for first eigenpair
+            eigvecs[:, 0] = 1
+            eigvals[0] = 1
+
+            #store in graph structure?
+            graph = {
+                'Hyperparameters': {
+                    'Sigma': self.sigma,
+                    'DiffusionNN': self.DiffusionNN
+                },
+                'EigenVecs': np.real(eigvecs),
+                'EigenVals': np.real(eigvals),
+                'StationaryDist': pi,
+                'P': P,
+                'W': W
+            }
+        except Exception as e:  
+            print('EigenDecomposition of P failed')
+            graph = {
+                'Hyperparameters': {
+                    'Sigma': self.sigma,
+                    'DiffusionNN': self.DiffusionNN
+                },
+                'EigenVecs': np.nan,
+                'EigenVals': np.nan,
+                'StationaryDist': np.nan,
+                'P': np.nan,
+                'W': np.nan
+            }
+        
+        return graph
 
 class DensityEstimator:
     '''
