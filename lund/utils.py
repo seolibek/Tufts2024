@@ -35,6 +35,7 @@ class GraphExtractor:
         W = np.zeros((n,n))
         P = np.zeros((n,n))
         D = np.zeros((n,n))
+        
 
         for i in range(n):
             #note mink in MATLAB returns k smallest elements of array and indices.
@@ -69,8 +70,14 @@ class GraphExtractor:
                 # pass
             else:
                 print('else condition of try executed')
-                eigvals, eigvecs = eigs(P, k=20) #scipy order is different (see docs if needed)
+                eigvals, eigvecs = eigs(P, k=15) #scipy order is different (see docs if needed)
+                print("Eigenvalues shape:", eigvals.shape)
+                print("Eigenvectors shape:", eigvecs.shape)
+
                 eigvals = np.real(eigvals)
+
+
+
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals))
                 n_eigs = np.argmax(eiggap) + 1 #python indexing is 0.
@@ -81,6 +88,9 @@ class GraphExtractor:
             idx = np.argsort(-np.abs(eigvals))
             eigvals = eigvals[idx][:n_eigs]
             eigvecs = eigvecs[:, idx][:n_eigs]
+            print("Eigenvalues shape:", eigvals.shape)
+            print("Eigenvectors shape:", eigvecs.shape)
+
             
             # setting theoretical val for first eigenpair
             eigvecs[:, 0] = 1
@@ -145,7 +155,9 @@ class DensityEstimator:
             D = pdist(X)
             D = squareform(D) #pairwise dist between points in X
             print('d is squareformed')
+        #TODO: pdist and squareform in np and matlab might be different - the number values are not the same. Debug / read documentation of pdist, squareform
         D = np.sort(D, axis=0)
+        #D values dont match up....
         print(D)
 
         if NN < n:

@@ -23,6 +23,9 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
 
     # Calculate diffusion map
     print('entered lund')
+    print("Number of Eigenvalues:", len(G['EigenVals']))
+    print("Number of Eigenvectors:", G['EigenVecs'].shape[1])
+
     DiffusionMap = np.zeros_like(G['EigenVecs'])
     print("G EigenVecs", G['EigenVecs'])
     # print("Diffusion map", DiffusionMap)

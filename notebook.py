@@ -12,6 +12,7 @@ data_path, gt_path, data_name, gt_name = '/Users/seoli/Desktop/DIAMONDS/Tufts202
 X, M, N, D, HSI, GT, Y, n, K = loadHSI(data_path, gt_path, data_name, gt_name)
 
 GT = GT - 1
+print(X.shape)
 HSI = X.reshape((M, N, D))
 graph_extractor = GraphExtractor(sigma=1.0, DiffusionNN=10, NEigs=5) #should probably add like sucess print statements here bc idrk if this works just yet..
 density_estimator = DensityEstimator(DensityNN=10, Sigma0=1.0)

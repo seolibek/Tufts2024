@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import MinMaxScaler
 from hyperopt import fmin, tpe, hp, Trials
 from hyperopt.pyll.base import scope
+
 class SimpleAutoencoder(nn.Module):
     '''
     Simple Autoencoder to extract most relevant features from hyperspectral image.
