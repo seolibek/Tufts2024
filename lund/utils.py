@@ -16,16 +16,20 @@ class GraphExtractor:
     If NEigs not included in Hyperparam structure, , = argmax(abs(diff(eigenvals))) 
     eigenvalues are included in graph structure.
     '''
-    def __init__(self, sigma, DiffusionNN, NEigs = None):
+    def __init__(self, sigma, DiffusionNN, NEigs = 10):
+        # values for SalinasA; sigma = 1.0, NN = 250
         self.sigma = sigma
         self.DiffusionNN = DiffusionNN
         self.NEigs = NEigs
 
     def extract_graph(self, X, Dist = None):
         n = len(X)
+        # print("n:",n) - value correct
         if Dist == None:
             Dist = pdist(X)
             Dist = squareform(Dist)
+            print("Dist AFTER squareform:", Dist)
+            # print('\n\n\n', Dist.shape) - value seems fine.
             print('distance proper init')
         #not doing the sptial params stuff for now, see lines 51-105
         W = np.zeros((n,n))
@@ -44,6 +48,8 @@ class GraphExtractor:
             W[i, sorting[1:]] = (np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2)))
             D[i, i] = np.sum(W[i, :])
             P[i, sorting[1:]] = W[i, sorting[1:]] / D[i, i]
+            
+
 
             #TODO: Checking all of these values...
         pi = np.diag(D) / np.sum(np.diag(D))
@@ -53,7 +59,14 @@ class GraphExtractor:
         try:
             if self.NEigs is not None:
                 #worry about implementing this later
-                pass
+                # there are 10 eigs
+                print(" IS this working???")
+                n_eigs = 10
+                eigvals, eigvecs = eigs(P, k=n_eigs) 
+                eigvals = np.real(eigvals)
+                sorted_eigvals = np.sort(-np.abs(eigvals))
+                eiggap = np.abs(np.diff(sorted_eigvals)) 
+                # pass
             else:
                 print('else condition of try executed')
                 eigvals, eigvecs = eigs(P, k=20) #scipy order is different (see docs if needed)

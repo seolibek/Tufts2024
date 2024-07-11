@@ -24,6 +24,8 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     # Calculate diffusion map
     print('entered lund')
     DiffusionMap = np.zeros_like(G['EigenVecs'])
+    print("G EigenVecs", G['EigenVecs'])
+    # print("Diffusion map", DiffusionMap)
     #iterating over columns?? i think matlab is indexed from 1
     print('replicate error')
     for l in range(DiffusionMap.shape[1]):
@@ -32,11 +34,13 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
 
     # Calculate pairwise diffusion distance at time t between points in X
     DiffusionDistance = squareform(pdist(np.real(DiffusionMap)))
+    print("DiffusionDistance", DiffusionDistance)
 
     # compute rho_t(x), stored as rt
     rt = np.zeros(n)
     for i in range(n):
         if p[i] != np.max(p):
+            print("test")
             rt[i] = np.min(DiffusionDistance[p > p[i], i])
         else:
             rt[i] = np.max(DiffusionDistance[i, :])
