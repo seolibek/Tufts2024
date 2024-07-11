@@ -3,7 +3,8 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import kneighbors_graph
 from scipy.sparse.csgraph import laplacian
 from scipy.sparse.linalg import eigs
-#matlabafdsdlfdklfjdslkfjdljksfljkdslfkjdslf
+from sklearn.neighbors import KernelDensity
+
 
 class GraphExtractor:
     '''
@@ -124,17 +125,17 @@ class GraphExtractor:
         
         return graph
 
-class DensityEstimator:
+class KDE:
     '''
-    Computes local densities of the points in an n x D matrix X, using the threshold value + KNN. 
-    Matrix of distances can be passed in..
-    Rewritten in python from https://github.com/sampolk/MultiscaleDiffusionClustering
+    SKLEARN!!!!
     '''
-    def __init__(self, DensityNN, Sigma0):
-        self.DensityNN = DensityNN
-        self.Sigma0 = Sigma0
+    def __init__(self, sigma, DiffusionNN, NEigs=10):
+        # values for SalinasA; sigma = 1.0, NN = 250
+        self.sigma = sigma
+        self.DiffusionNN = DiffusionNN
+        self.NEigs = NEigs
 
-    def kde(self, X, D=None):
+    def kde(self, X):
         """
         Computes the local densities of the points in an n x D matrix X using
         the threshold value th. Uses K nearest neighbor. A matrix of distances may
@@ -144,29 +145,9 @@ class DensityEstimator:
         :param D: Optional precomputed distance matrix
         :return: p: Local densities of points in X
         """
-        #Extract Hyperparams
-        NN = self.DensityNN
-        sigma0 = self.Sigma0
-        n = len(X)
+        kde_sklearn = KernelDensity(kernel='gaussian', bandwidth=self.sigma).fit(X)
+        log_density = kde_sklearn.score_samples(X)
+        p_sklearn = np.exp(log_density)
 
-        # Initialize 
-        p = np.zeros(n)
-        if D is None:
-            D = pdist(X)
-            D = squareform(D) #pairwise dist between points in X
-            print('d is squareformed')
-        #TODO: pdist and squareform in np and matlab might be different - the number values are not the same. Debug / read documentation of pdist, squareform
-        D = np.sort(D, axis=0)
-        #D values dont match up....
-        print(D)
-
-        if NN < n:
-            print('pre sum)')
-            p = np.sum(np.exp(-(D[:NN + 1, :] ** 2) / (sigma0 ** 2)), axis=0)
-            print("Updated")
-        else:
-            p = (np.sum(np.exp(-(D ** 2) / (sigma0 ** 2)), axis=0))
-
-       
-        p = p / np.sum(p)
-        return p
+        p_sklearn /= np.sum(p_sklearn)
+        return p_sklearn
