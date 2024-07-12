@@ -61,7 +61,9 @@ class GraphExtractor:
             if self.NEigs is not None:
                 #worry about implementing this later
                 # there are 10 eigs
-                print(" IS this working???")
+                print(" IS this working??? - SELF.NEIGS IS NOT NONE")
+                print("Eigenvalues shape:", eigvals.shape)
+                print("Eigenvectors shape:", eigvecs.shape)
                 n_eigs = 1000
                 eigvals, eigvecs = eigs(P, k=n_eigs) 
                 eigvals = np.real(eigvals)
@@ -76,7 +78,6 @@ class GraphExtractor:
                 print("Eigenvectors shape:", eigvecs.shape)
 
                 eigvals = np.real(eigvals)
-
 
 
                 sorted_eigvals = np.sort(-np.abs(eigvals))
