@@ -17,7 +17,7 @@ class GraphExtractor:
     If NEigs not included in Hyperparam structure, , = argmax(abs(diff(eigenvals))) 
     eigenvalues are included in graph structure.
     '''
-    def __init__(self, sigma, DiffusionNN, NEigs = 10):
+    def __init__(self, sigma = 1.0, DiffusionNN = 250, NEigs = 10):
         # values for SalinasA; sigma = 1.0, NN = 250
         self.sigma = sigma
         self.DiffusionNN = DiffusionNN
@@ -29,27 +29,26 @@ class GraphExtractor:
         if Dist == None:
             Dist = pdist(X)
             Dist = squareform(Dist)
-            print("Dist AFTER squareform:", Dist)
-            # print('\n\n\n', Dist.shape) - value seems fine.
-            print('distance proper init')
-        #not doing the sptial params stuff for now, see lines 51-105
+ 
         W = np.zeros((n,n))
         P = np.zeros((n,n))
         D = np.zeros((n,n))
         
-
+        print(Dist)
         for i in range(n):
             #note mink in MATLAB returns k smallest elements of array and indices.
             #rewritten in python .. sort should sort the distances and argsort should return the indices.
 
             #apparently there exists a more effecient way. fix later?
-            D_sorted, sorting = np.sort(Dist[i, :])[:self.DiffusionNN+1], np.argsort(Dist[i, :])[:self.DiffusionNN+1]
+            idx = np.argpartition(Dist[i, :], self.DiffusionNN + 1)[:self.DiffusionNN + 1]
+            D_sorted = Dist[i, idx]
+            sorting = np.argsort(D_sorted)
+            idx = idx[sorting]
 
-            #TODO: compare values with matlab code + see output for D_sorted , sorting (currently very off)
+            W[i, idx[1:]] = np.exp(-(D_sorted[sorting][1:] ** 2) / (self.sigma ** 2))
+            D[i, i] = np.sum(W[i, :])  
+            P[i, idx[1:]] = W[i, idx[1:]] / D[i, i]
 
-            W[i, sorting[1:]] = (np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2)))
-            D[i, i] = np.sum(W[i, :])
-            P[i, sorting[1:]] = W[i, sorting[1:]] / D[i, i]
             
 
 
@@ -63,11 +62,12 @@ class GraphExtractor:
                 #worry about implementing this later
                 # there are 10 eigs
                 print(" IS this working???")
-                n_eigs = 10
+                n_eigs = 1000
                 eigvals, eigvecs = eigs(P, k=n_eigs) 
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals)) 
+                
                 # pass
             else:
                 print('else condition of try executed')
@@ -129,7 +129,7 @@ class KDE:
     '''
     SKLEARN!!!!
     '''
-    def __init__(self, sigma, DiffusionNN, NEigs=10):
+    def __init__(self, sigma = 1.0, DiffusionNN = 250, NEigs=10):
         # values for SalinasA; sigma = 1.0, NN = 250
         self.sigma = sigma
         self.DiffusionNN = DiffusionNN

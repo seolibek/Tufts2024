@@ -24,26 +24,27 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     # Calculate diffusion map
     print('entered lund')
     print("Number of Eigenvalues:", len(G['EigenVals']))
-    print("Number of Eigenvectors:", G['EigenVecs'].shape[1])
+    print("Number of Eigenvectors:", G['EigenVecs'].shape)
 
     DiffusionMap = np.zeros_like(G['EigenVecs'])
-    print("G EigenVecs", G['EigenVecs'])
+    # print("G EigenVecs", G['EigenVecs'])
     # print("Diffusion map", DiffusionMap)
     #iterating over columns?? i think matlab is indexed from 1
     print('replicate error')
     for l in range(DiffusionMap.shape[1]):
-        DiffusionMap[:, l] = (G['EigenVecs'][:, l] * (np.power(G['EigenVals'][l],t)))
+        DiffusionMap[:, l] = G['EigenVecs'][:, l] * (G['EigenVals'][l]**t)
+
 
 
     # Calculate pairwise diffusion distance at time t between points in X
     DiffusionDistance = squareform(pdist(np.real(DiffusionMap)))
-    print("DiffusionDistance", DiffusionDistance)
+    print('p is ', p)
+    print("DiffusionDistance", DiffusionDistance.shape)
 
     # compute rho_t(x), stored as rt
     rt = np.zeros(n)
     for i in range(n):
         if p[i] != np.max(p):
-            print("test")
             rt[i] = np.min(DiffusionDistance[p > p[i], i])
         else:
             rt[i] = np.max(DiffusionDistance[i, :])
@@ -58,13 +59,13 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
         K = K_known
     else:
         ratios = np.divide(Dt[m_sorting[0:n-1]], Dt[m_sorting[1:n]])
-        K = np.argmax(ratios)
+        K = np.argmax(ratios) + 1
 
     if K == 1:
         C = np.ones(n, dtype=int)
     else:
         # Label modes
-        C[m_sorting[:K]] = np.arange(0, K)
+        C[m_sorting[:K]] = np.arange(1, K + 1)
 
         # Label non-modal points according to the label of their Dt-nearest
         # neighbor of higher density that is already labeled.
@@ -73,7 +74,11 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
             i = l_sorting[j]
             if C[i] == 0:  # unlabeled point
                 candidates = np.where((p >= p[i]) & (C > 0))[0]
-                temp_idx = np.argmin(DiffusionDistance[i, candidates])
-                C[i] = C[candidates[temp_idx]]
+                if len(candidates) > 0:
+                    temp_idx = np.argmin(DiffusionDistance[i, candidates])
+                    C[i] = C[candidates[temp_idx]]
+                else:
+                    # Handle the case where no candidates are found
+                    C[i] = -1  # Assign a default value, or handle as needed
 
     return C, K, Dt
