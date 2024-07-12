@@ -38,8 +38,6 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
 
     # Calculate pairwise diffusion distance at time t between points in X
     DiffusionDistance = squareform(pdist(np.real(DiffusionMap)))
-    print('p is ', p)
-    print("DiffusionDistance", DiffusionDistance.shape)
 
     # compute rho_t(x), stored as rt
     rt = np.zeros(n)
@@ -80,5 +78,6 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
                 else:
                     # Handle the case where no candidates are found
                     C[i] = -1  # Assign a default value, or handle as needed
+                    print('this was a bandaid')
 
     return C, K, Dt
