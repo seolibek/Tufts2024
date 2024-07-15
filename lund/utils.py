@@ -17,7 +17,7 @@ class GraphExtractor:
     If NEigs not included in Hyperparam structure, , = argmax(abs(diff(eigenvals))) 
     eigenvalues are included in graph structure.
     '''
-    def __init__(self, sigma = 1.0, DiffusionNN = 250, NEigs = 10):
+    def __init__(self, sigma = 1.0, DiffusionNN = 250, NEigs = 1000):
         # values for SalinasA; sigma = 1.0, NN = 250
         self.sigma = sigma
         self.DiffusionNN = DiffusionNN
@@ -58,18 +58,23 @@ class GraphExtractor:
         #ok do the eigendecomp here..
         print('entering try')
         try:
+            # If the number of eigenvalues is specified, choose that.
             if self.NEigs is not None:
                 #worry about implementing this later
                 # there are 10 eigs
-                print(" IS this working??? - SELF.NEIGS IS NOT NONE")
+                print("SELF.NEIGS IS NOT NONE")
                 print("Eigenvalues shape:", eigvals.shape)
                 print("Eigenvectors shape:", eigvecs.shape)
-                n_eigs = 1000
-                eigvals, eigvecs = eigs(P, k=n_eigs) 
-                eigvals = np.real(eigvals)
-                sorted_eigvals = np.sort(-np.abs(eigvals))
-                eiggap = np.abs(np.diff(sorted_eigvals)) 
+                n_eigs = self.NEigs
+                # eigvals, eigvecs = eigs(P, k=n_eigs) 
+                # eigvals = np.real(eigvals)
+                # sorted_eigvals = np.sort(-np.abs(eigvals))
+                # eiggap = np.abs(np.diff(sorted_eigvals)) 
                 
+                eigvals, eigvecs = eigs(P, k=n_eigs)
+                idx = np.argsort(np.abs(eigvals))[::-1]
+                eigvals = eigvals[idx]
+                eigvecs = eigvecs[:, idx]
                 # pass
             else:
                 print('else condition of try executed')
