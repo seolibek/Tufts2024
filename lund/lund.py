@@ -77,7 +77,7 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
                     C[i] = C[candidates[temp_idx]]
                 else:
                     # Handle the case where no candidates are found
-                    C[i] = -1  # Assign a default value, or handle as needed
+                    C[i] = -1  
                     print('this was a bandaid')
 
     return C, K, Dt
