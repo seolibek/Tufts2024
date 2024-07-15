@@ -150,4 +150,4 @@ class KDE:
         p_sklearn = np.exp(log_density)
 
         p_sklearn /= np.sum(p_sklearn)
-        return p_sklearn
+        return p_sklearn    
