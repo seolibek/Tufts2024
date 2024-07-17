@@ -51,6 +51,7 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     #ignore . element wise operations handled in python.
     Dt = rt * p
     m_sorting = np.argsort(-Dt) #sorting in descending order technically bc negative versions
+    print("m_sorting:", m_sorting)
 
     # Determine K based on the ratio of sorted Dt(x_{m_k})
     if K_known is not None: #nargin dne in python.
@@ -58,6 +59,7 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     else:
         ratios = np.divide(Dt[m_sorting[0:n-1]], Dt[m_sorting[1:n]])
         K = np.argmax(ratios) + 1
+    print("Number of clusters K:", K)
 
     if K == 1:
         C = np.ones(n, dtype=int)
