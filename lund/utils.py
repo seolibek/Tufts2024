@@ -17,15 +17,15 @@ class GraphExtractor:
     If NEigs not included in Hyperparam structure, , = argmax(abs(diff(eigenvals))) 
     eigenvalues are included in graph structure.
     '''
-    def __init__(self, sigma = 1.0, DiffusionNN = 250, NEigs = 10):
-        # values for SalinasA; sigma = 1.0, NN = 250
+    def __init__(self, sigma = 1.0, DiffusionNN = 100, NEigs = 1000):
         self.sigma = sigma
         self.DiffusionNN = DiffusionNN
-        self.NEigs = NEigs
+        self.NEigs = int(NEigs)
+        print(f"Initialized with NEigs = {self.NEigs} (type: {type(self.NEigs)})")
+
 
     def extract_graph(self, X, Dist = None):
         n = len(X)
-        # print("n:",n) - value correct
         if Dist == None:
             Dist = pdist(X)
             Dist = squareform(Dist)
@@ -36,10 +36,6 @@ class GraphExtractor:
         
         print(Dist)
         for i in range(n):
-            #note mink in MATLAB returns k smallest elements of array and indices.
-            #rewritten in python .. sort should sort the distances and argsort should return the indices.
-
-            #apparently there exists a more effecient way. fix later?
             idx = np.argpartition(Dist[i, :], self.DiffusionNN + 1)[:self.DiffusionNN + 1]
             D_sorted = Dist[i, idx]
             sorting = np.argsort(D_sorted)
@@ -50,20 +46,15 @@ class GraphExtractor:
             P[i, idx[1:]] = W[i, idx[1:]] / D[i, i]
 
             
-
-
-            #TODO: Checking all of these values...
         pi = np.diag(D) / np.sum(np.diag(D))
 
         #ok do the eigendecomp here..
         print('entering try')
         try:
+            
             if self.NEigs is not None:
-                #worry about implementing this later
-                # there are 10 eigs
-                print(" IS this working???")
-                n_eigs = 1000
-                eigvals, eigvecs = eigs(P, k=n_eigs) 
+                n_eigs = min(self.NEigs, n) #ask about the significance of this line - i tried casting but it doesnt work w that
+                eigvals, eigvecs = eigs(P, k = n_eigs) 
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals)) 
@@ -82,10 +73,8 @@ class GraphExtractor:
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals))
                 n_eigs = np.argmax(eiggap) + 1 #python indexing is 0.
-                #"fringe cases"
                 if n_eigs < 5:
                     n_eigs = 5
-            #again,,,,,  capabilities python j doesnt have.
             idx = np.argsort(-np.abs(eigvals))
             eigvals = eigvals[idx][:n_eigs]
             eigvecs = eigvecs[:, idx][:n_eigs]
@@ -124,30 +113,19 @@ class GraphExtractor:
             }
         
         return graph
+    def compute_diffusion_distances(self, graph, X):
+        eigvecs = graph['EigenVecs']
+        eigvals = graph['EigenVals']
 
-class KDE:
-    '''
-    SKLEARN!!!!
-    '''
-    def __init__(self, sigma = 1.0, DiffusionNN = 250, NEigs=10):
-        # values for SalinasA; sigma = 1.0, NN = 250
-        self.sigma = sigma
-        self.DiffusionNN = DiffusionNN
-        self.NEigs = NEigs
+        # Check if eigen decomposition succeeded
+        if np.isnan(eigvecs).any() or np.isnan(eigvals).any():
+            print("Eigen decomposition failed. Diffusion map cannot be computed.")
+            return None
 
-    def kde(self, X):
-        """
-        Computes the local densities of the points in an n x D matrix X using
-        the threshold value th. Uses K nearest neighbor. A matrix of distances may
-        be passed in.
+        t = 43  # Diffusion time, can be adjusted
+        print(f"Computing diffusion map with t = {t}")
+        diffusion_map = eigvecs * np.exp(-eigvals * t)
 
-        :param X: Data matrix (n x D)
-        :param D: Optional precomputed distance matrix
-        :return: p: Local densities of points in X
-        """
-        kde_sklearn = KernelDensity(kernel='gaussian', bandwidth=self.sigma).fit(X)
-        log_density = kde_sklearn.score_samples(X)
-        p_sklearn = np.exp(log_density)
+        return diffusion_map
 
-        p_sklearn /= np.sum(p_sklearn)
-        return p_sklearn    
+
