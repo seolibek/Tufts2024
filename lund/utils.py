@@ -53,8 +53,7 @@ class GraphExtractor:
         try:
             
             if self.NEigs is not None:
-                n_eigs = min(self.NEigs, n) #ask about the significance of this line - i tried casting but it doesnt work w that
-                eigvals, eigvecs = eigs(P, k = n_eigs) 
+                eigvals, eigvecs = eigs(P, k = self.NEigs) 
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals)) 
