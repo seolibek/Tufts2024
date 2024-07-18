@@ -4,7 +4,9 @@ from sklearn.neighbors import kneighbors_graph
 from scipy.sparse.csgraph import laplacian
 from scipy.sparse.linalg import eigs
 from sklearn.neighbors import KernelDensity
-
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import svds
+from scipy.spatial.distance import cdist
 
 class GraphExtractor:
     '''
@@ -53,7 +55,8 @@ class GraphExtractor:
         try:
             
             if self.NEigs is not None:
-                eigvals, eigvecs = eigs(P, k = self.NEigs) 
+                n_eigs = min(self.NEigs, n)
+                eigvals, eigvecs = eigs(P, k = n_eigs) 
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals)) 
@@ -112,19 +115,42 @@ class GraphExtractor:
             }
         
         return graph
-    def compute_diffusion_distances(self, graph, X):
-        eigvecs = graph['EigenVecs']
-        eigvals = graph['EigenVals']
+    
+    #code taken from Kabir's implementation of LAND components, in python.
 
-        # Check if eigen decomposition succeeded
-        if np.isnan(eigvecs).any() or np.isnan(eigvals).any():
-            print("Eigen decomposition failed. Diffusion map cannot be computed.")
-            return None
+    # def gaussian_kernel(D):  # D = adjacency
+    #     sigma = 1 * np.mean(D[D > 0])
+    #     gaussian_kernel = np.exp(- (D ** 2 / (sigma ** 2)))
+    #     gaussian_kernel[D == 0] = 0
+    #     I = np.eye(len(D))
+    #     gaussian_kernel = gaussian_kernel + I
+    #     return gaussian_kernel
 
-        t = 43  # Diffusion time, can be adjusted
-        print(f"Computing diffusion map with t = {t}")
-        diffusion_map = eigvecs * np.exp(-eigvals * t)
+    # def diffusion_map(W):  # W = weight/gaussian kernel matrix
+    #     row_sums = np.sum(W, axis=1)
+    #     D = W / row_sums[:, np.newaxis]
+    #     return D
 
-        return diffusion_map
+    # def embed(P, t):  # P = diffusion matrix, t = time
+    #     sparse_P = csr_matrix(P)
+    #     k = 8  # Number of singular values to compute
+    #     U, S, VT = svds(sparse_P, k=k)
+    #     paired_elements = np.array([U[:, i] * (S[i] ** t) for i in range(k)]).T
+    #     return paired_elements, U, S, VT
 
+    # def diffusion_dist(Emb):
+    #     return cdist(Emb, Emb)
 
+    # def diffusion_distance(G, t):
+    #     eigvecs = G['EigenVecs']
+    #     eigvals = G['EigenVals']
+    #     emb = np.array([eigvecs[:, i] * (eigvals[i] ** t) for i in range(len(eigvals))]).T
+    #     return cdist(emb, emb)
+    
+def diffusion_distance(G,t):
+# Compute the embedding
+    eigenvecs = G['EigenVecs']
+    eigenvals = G['EigenVals'] 
+    emb = np.array([eigenvecs[:, i] * (eigenvals[i] ** t) for i in range(len(eigenvals))]).T
+    # Compute the pairwise distances
+    return cdist(emb, emb), emb
