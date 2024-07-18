@@ -118,35 +118,6 @@ class GraphExtractor:
     
     #code taken from Kabir's implementation of LAND components, in python.
 
-    # def gaussian_kernel(D):  # D = adjacency
-    #     sigma = 1 * np.mean(D[D > 0])
-    #     gaussian_kernel = np.exp(- (D ** 2 / (sigma ** 2)))
-    #     gaussian_kernel[D == 0] = 0
-    #     I = np.eye(len(D))
-    #     gaussian_kernel = gaussian_kernel + I
-    #     return gaussian_kernel
-
-    # def diffusion_map(W):  # W = weight/gaussian kernel matrix
-    #     row_sums = np.sum(W, axis=1)
-    #     D = W / row_sums[:, np.newaxis]
-    #     return D
-
-    # def embed(P, t):  # P = diffusion matrix, t = time
-    #     sparse_P = csr_matrix(P)
-    #     k = 8  # Number of singular values to compute
-    #     U, S, VT = svds(sparse_P, k=k)
-    #     paired_elements = np.array([U[:, i] * (S[i] ** t) for i in range(k)]).T
-    #     return paired_elements, U, S, VT
-
-    # def diffusion_dist(Emb):
-    #     return cdist(Emb, Emb)
-
-    # def diffusion_distance(G, t):
-    #     eigvecs = G['EigenVecs']
-    #     eigvals = G['EigenVals']
-    #     emb = np.array([eigvecs[:, i] * (eigvals[i] ** t) for i in range(len(eigvals))]).T
-    #     return cdist(emb, emb)
-    
 def diffusion_distance(G,t):
 # Compute the embedding
     eigenvecs = G['EigenVecs']
