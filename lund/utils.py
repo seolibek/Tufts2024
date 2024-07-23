@@ -28,32 +28,15 @@ class GraphExtractor:
 
     def extract_graph(self, X, Dist = None):
         n = len(X)
-        # if Dist == None:
-        #     Dist = pdist(X)
-        #     Dist = squareform(Dist)
+        if Dist == None:
+            Dist = pdist(X)
+            Dist = squareform(Dist)
  
-        # W = np.zeros((n,n))
-        # P = np.zeros((n,n))
-        # D = np.zeros((n,n))
+        W = np.zeros((n,n))
+        P = np.zeros((n,n))
+        D = np.zeros((n,n))
         
-        # #potentially the indexing here
-        # for i in range(n):
-        #     idx = np.argpartition(Dist[i, :], self.DiffusionNN + 1)[:self.DiffusionNN + 1]
-        #     D_sorted = Dist[i, idx]
-        #     sorting = np.argsort(D_sorted)
-        #     idx = idx[sorting]
-
-        #     W[i, idx[1:]] = np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2))
-        #     D[i, i] = np.sum(W[i, :])  
-        #     P[i, idx[1:]] = W[i, idx[1:]] / D[i, i]
-
-            
-        # pi = np.diag(D) / np.sum(np.diag(D))
-        Dist = squareform(pdist(X))
-        W = np.zeros((n, n))
-        P = np.zeros((n, n))
-        D = np.zeros(n)  
-
+        #potentially the indexing here
         for i in range(n):
             idx = np.argpartition(Dist[i, :], self.DiffusionNN + 1)[:self.DiffusionNN + 1]
             D_sorted = Dist[i, idx]
@@ -61,14 +44,39 @@ class GraphExtractor:
             idx = idx[sorting]
 
             W[i, idx[1:]] = np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2))
+            D[i, i] = np.sum(W[i, :])  
+            P[i, idx[1:]] = W[i, idx[1:]] / D[i, i]
+
             
-            D[i] = np.sum(W[i, :])
+        pi = np.diag(D) / np.sum(np.diag(D))
+        print(P.shape)
+        # Dist = squareform(pdist(X))
+        # W = np.zeros((n, n))
+        # P = np.zeros((n, n))
+        # D = np.zeros(n)  
 
-            if D[i] > 0:  
-                P[i, idx[1:]] = W[i, idx[1:]] / D[i]
+        # for i in range(n):
+        #     idx = np.argpartition(Dist[i, :], self.DiffusionNN + 1)[:self.DiffusionNN + 1]
+        #     D_sorted = Dist[i, idx]
+        #     sorting = np.argsort(D_sorted)
+        #     idx = idx[sorting]
 
-        pi = D / np.sum(D)
+        #     W[i, idx[1:]] = np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2))
+            
+        #     D[i] = np.sum(W[i, :])
 
+        #     if D[i] > 0:  
+        #         P[i, idx[1:]] = W[i, idx[1:]] / D[i]
+
+        # pi = D / np.sum(D)
+        print('prob',P)
+        row_sums = np.sum(P, axis=1)
+
+        # Check if each row sums to 1
+        if np.allclose(row_sums, 1):
+            print("All rows sum to 1.")
+        else:
+            print("Not all rows sum to 1.")
         #ok do the eigendecomp here..
         try:
             
