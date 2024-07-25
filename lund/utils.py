@@ -134,8 +134,7 @@ class GraphExtractor:
         try:
             
             if self.NEigs is not None:
-                n_eigs = min(self.NEigs, n)
-                eigvals, eigvecs = eigs(P, k = n_eigs) 
+                eigvals, eigvecs = eigs(P, k = self.NEigs) 
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals)) 
