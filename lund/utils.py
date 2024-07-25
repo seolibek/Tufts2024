@@ -135,7 +135,7 @@ class GraphExtractor:
             
             if self.NEigs is not None:
                 n_eigs = min(self.NEigs, n)
-                eigvals, eigvecs = eigs(P, k = 20) 
+                eigvals, eigvecs = eigs(P, k = n_eigs) 
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals)) 
@@ -244,15 +244,14 @@ def diffusion_distance(G,t):
 # Compute the embedding
     eigenvecs = G['EigenVecs']
     eigenvals = G['EigenVals']
-
     emb = np.array([eigenvecs[:, i] * (eigenvals[i] ** t) for i in range(len(eigenvals))]).T
     
-    print(f"Embedding at t={t}:")
-    print(emb)
+    # print(f"Embedding at t={t}:")
+    # print(emb)
 
     diffusion_distances = cdist(emb, emb)
 
-    print(f"Diffusion distance matrix at t={t}:")
-    print(diffusion_distances)
+    # print(f"Diffusion distance matrix at t={t}:")
+    # print(diffusion_distances)
 
     return diffusion_distances, emb

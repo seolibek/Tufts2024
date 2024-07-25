@@ -30,11 +30,11 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     # print("G EigenVecs", G['EigenVecs'])
     # print("Diffusion map", DiffusionMap)
     #iterating over columns?? i think matlab is indexed from 1
-    print('replicate error')
+    print(DiffusionMap.shape[1])
+    print("Shape of G['EigenVecs']:", G['EigenVecs'].shape)
+    print("Shape of G['EigenVals']:", G['EigenVals'].shape)
     for l in range(DiffusionMap.shape[1]):
         DiffusionMap[:, l] = G['EigenVecs'][:, l] * (G['EigenVals'][l]**t)
-
-
 
     # Calculate pairwise diffusion distance at time t between points in X
     DiffusionDistance = squareform(pdist(np.real(DiffusionMap)))
@@ -47,13 +47,10 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
         else:
             rt[i] = np.max(DiffusionDistance[i, :])
 
-    # Extract Dt(x) and sort in descending order
-    #ignore . element wise operations handled in python.
     Dt = rt * p
     m_sorting = np.argsort(-Dt) #sorting in descending order technically bc negative versions
     print("m_sorting:", m_sorting)
 
-    # Determine K based on the ratio of sorted Dt(x_{m_k})
     if K_known is not None: #nargin dne in python.
         K = K_known
     else:
@@ -66,9 +63,6 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     else:
         # Label modes
         C[m_sorting[:K]] = np.arange(1, K + 1)
-
-        # Label non-modal points according to the label of their Dt-nearest
-        # neighbor of higher density that is already labeled.
         l_sorting = np.argsort(-p)
         for j in range(n):
             i = l_sorting[j]
@@ -77,9 +71,9 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
                 if len(candidates) > 0:
                     temp_idx = np.argmin(DiffusionDistance[i, candidates])
                     C[i] = C[candidates[temp_idx]]
-                else:
-                    # Handle the case where no candidates are found
-                    C[i] = -1  
-                    print('this was a bandaid')
+                # else:
+                #     # Handling the case where no candidates are found?
+                #     C[i] = -1  
+                #     print('this was a bandaid')
 
     return C, K, Dt
