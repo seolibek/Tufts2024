@@ -35,8 +35,7 @@ class GraphExtractor:
         if Dist == None:
             Dist = pdist(X)
             Dist = squareform(Dist)
-            print("Pairwise Distance Matrix:")
-            print(Dist)
+
  
         W = np.zeros((n,n))
         P = np.zeros((n,n))
@@ -54,87 +53,11 @@ class GraphExtractor:
 
             
         pi = np.diag(D) / np.sum(np.diag(D))
-        print("Transition Matrix:")
-        print(P)
-        # Dist = squareform(pdist(X))
-        # W = np.zeros((n, n))
-        # P = np.zeros((n, n))
-        # D = np.zeros(n)  
-
-        # for i in range(n):
-        #     idx = np.argpartition(Dist[i, :], self.DiffusionNN + 1)[:self.DiffusionNN + 1]
-        #     D_sorted = Dist[i, idx]
-        #     sorting = np.argsort(D_sorted)
-        #     idx = idx[sorting]
-
-        #     W[i, idx[1:]] = np.exp(-(D_sorted[1:] ** 2) / (self.sigma ** 2))
-            
-        #     D[i] = np.sum(W[i, :])
-
-        #     if D[i] > 0:  
-        #         P[i, idx[1:]] = W[i, idx[1:]] / D[i]
-
-        # pi = D / np.sum(D)
-        # print(P[1])
-        # print('prob',P)
-
-
-        # row_sums = np.sum(P, axis=1)
-        # print('row sum',row_sums)
-        # # Check if each row sums to 1
-        # if np.allclose(row_sums, 1):
-        #     print("All rows sum to 1.")
-        # else:
-        #     print("Not all rows sum to 1.")
-
-        #below is a test to see if my transition matrix, P,  is constructed as expected. Also W and D.
-        # X, GT = make_moons(n_samples=100, noise=0.1, random_state=42)
-
-        # plt.scatter(X[:, 0], X[:, 1], c=GT, cmap=plt.cm.Paired)
-        # plt.title('Moons Dataset with Ground Truth Labels')
-        # plt.show()
-
-        # # Plot transitions (for a subset for clarity)
-        # subset = np.random.choice(range(len(X)), size=20, replace=False)
-        # for i in subset:
-        #     for j in range(len(P)):
-        #         if P[i, j] > 0:
-        #             plt.plot([X[i, 0], X[j, 0]], [X[i, 1], X[j, 1]], 'k-', alpha=0.2)
-
-        # plt.scatter(X[:, 0], X[:, 1], c=GT, cmap=plt.cm.Paired)
-        # plt.title('Moons Dataset with Transition Paths')
-        # plt.show()
-        # Verify the Degree Matrix
-        # degree_sums = np.sum(W, axis=1)
-        # print("Degree sums:", degree_sums)
-
-        # # Visualize the Weight Matrix
-        # plt.figure(figsize=(10, 8))
-        # plt.imshow(W, cmap='viridis')
-        # plt.colorbar()
-        # plt.title('Weight Matrix (W)')
-        # plt.show()
-
-        # # Visualize the Degree Matrix
-        # plt.figure(figsize=(10, 8))
-        # plt.imshow(D, cmap='viridis')
-        # plt.colorbar()
-        # plt.title('Degree Matrix (D)')
-        # plt.show()
-
-        # # Visualize Degree Values
-        # plt.figure(figsize=(10, 8))
-        # plt.bar(np.arange(n), np.diag(D))
-        # plt.title('Degree Values')
-        # plt.xlabel('Index')
-        # plt.ylabel('Degree')
-        # plt.show()
-        
-        #ok do the eigendecomp here..
         try:
             
             if self.NEigs is not None:
-                eigvals, eigvecs = eigs(P, k = self.NEigs) 
+                n_eigs = min(self.NEigs, n)
+                eigvals, eigvecs = eigs(P, k = n_eigs) 
                 eigvals = np.real(eigvals)
                 sorted_eigvals = np.sort(-np.abs(eigvals))
                 eiggap = np.abs(np.diff(sorted_eigvals)) 
@@ -152,64 +75,11 @@ class GraphExtractor:
             idx = np.argsort(-np.abs(eigvals))
             eigvals = eigvals[idx][:n_eigs]
             eigvecs = eigvecs[:, idx][:n_eigs]
+            print('debugguing eigenvales length is ', len(eigvals))
 
-            
-            # setting theoretical val for first eigenpair
             eigvecs[:, 0] = 1
             eigvals[0] = 1
-            # Debugging output
-             # Plot the eigenvalues
-            # plt.figure(figsize=(10, 6))
-            # plt.plot(np.arange(len(eigvals)), eigvals, 'o-', label='Eigenvalues')
-            # plt.title('Eigenvalues of Transition Matrix')
-            # plt.xlabel('Index')
-            # plt.ylabel('Eigenvalue')
-            # plt.legend()
-            # plt.grid(True)
-            # plt.show()
-
-            # # Plot the eigengap
-            # eiggap = np.abs(np.diff(np.sort(-np.abs(eigvals))))
-            # plt.figure(figsize=(10, 6))
-            # plt.plot(np.arange(len(eiggap)), eiggap, 'o-', label='Eigengap')
-            # plt.title('Eigengap of Transition Matrix')
-            # plt.xlabel('Index')
-            # plt.ylabel('Eigengap')
-            # plt.legend()
-            # plt.grid(True)
-            # plt.show()
-
-            # # Plot the first few eigenvectors
-            # plt.figure(figsize=(10, 6))
-            # for i in range(3):  # Plot the first three eigenvectors
-            #     plt.plot(eigvecs[:, i], label=f'Eigenvector {i+1}')
-            # plt.title('First Three Eigenvectors')
-            # plt.xlabel('Index')
-            # plt.ylabel('Value')
-            # plt.legend()
-            # plt.grid(True)
-            # plt.show()
-
-            # # Scatter plot using the second and third eigenvectors
-            # plt.figure(figsize=(10, 8))
-            # plt.scatter(X[:, 0], X[:, 1], c=eigvecs[:, 1], cmap='viridis')
-            # plt.colorbar(label='Eigenvector 2 values')
-            # plt.title('Data Points Colored by Second Eigenvector')
-            # plt.xlabel('Feature 1')
-            # plt.ylabel('Feature 2')
-            # plt.show()
-
-            # plt.figure(figsize=(10, 8))
-            # plt.scatter(X[:, 0], X[:, 1], c=eigvecs[:, 2], cmap='viridis')
-            # plt.colorbar(label='Eigenvector 3 values')
-            # plt.title('Data Points Colored by Third Eigenvector')
-            # plt.xlabel('Feature 1')
-            # plt.ylabel('Feature 2')
-            # plt.show()
-
-
-
-            #store in graph structure?
+           
             graph = {
                 'Hyperparameters': {
                     'Sigma': self.sigma,
@@ -237,7 +107,18 @@ class GraphExtractor:
         
         return graph
     
-    #code taken from Kabir's implementation of LAND components, in python.
+# def compute_kde_in_reduced_space(X, eigenvecs, bandwidth=1.0):
+#     eigenvecs_reduced = eigenvecs[:, :X.shape[1]].T
+    
+#     X_reduced = np.dot(X, eigenvecs_reduced)
+    
+#     kde = KernelDensity(bandwidth=bandwidth)
+#     print('shape of X_reduced is', X_reduced.shape)
+#     kde.fit(X_reduced)
+#     log_density = kde.score_samples(X_reduced)    
+#     p = np.exp(log_density)
+#     return p
+
 
 def diffusion_distance(G,t):
 # Compute the embedding
@@ -245,9 +126,6 @@ def diffusion_distance(G,t):
     eigenvals = G['EigenVals']
     emb = np.array([eigenvecs[:, i] * (eigenvals[i] ** t) for i in range(len(eigenvals))]).T
     
-    # print(f"Embedding at t={t}:")
-    # print(emb)
-
     diffusion_distances = cdist(emb, emb)
 
     # print(f"Diffusion distance matrix at t={t}:")

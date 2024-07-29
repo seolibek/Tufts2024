@@ -6,6 +6,10 @@ from scipy.spatial.distance import pdist, squareform
 2.). Compute diffusion distances on the graph and a kernel density estimator.
 3.). Label using the LUND scheme.'''
 
+
+
+#below is Sam Polk's implementation of LUND.
+
 def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     '''
     This functino produces a structure with multiscale clusterings produced with the LUND algorithm.
@@ -27,19 +31,14 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
     print("Number of Eigenvectors:", G['EigenVecs'].shape)
 
     DiffusionMap = np.zeros_like(G['EigenVecs'])
-    # print("G EigenVecs", G['EigenVecs'])
-    # print("Diffusion map", DiffusionMap)
-    #iterating over columns?? i think matlab is indexed from 1
-    print(DiffusionMap.shape[1])
+
     print("Shape of G['EigenVecs']:", G['EigenVecs'].shape)
     print("Shape of G['EigenVals']:", G['EigenVals'].shape)
     for l in range(DiffusionMap.shape[1]):
         DiffusionMap[:, l] = G['EigenVecs'][:, l] * (G['EigenVals'][l]**t)
 
-    # Calculate pairwise diffusion distance at time t between points in X
     DiffusionDistance = squareform(pdist(np.real(DiffusionMap)))
-    print(p.shape)
-    print(DiffusionDistance.shape)
+
 
     # compute rho_t(x), stored as rt
     rt = np.zeros(n)
@@ -50,10 +49,10 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
             rt[i] = np.max(DiffusionDistance[i, :])
 
     Dt = rt * p
-    m_sorting = np.argsort(-Dt) #sorting in descending order technically bc negative versions
+    m_sorting = np.argsort(-Dt) 
     print("m_sorting:", m_sorting)
 
-    if K_known is not None: #nargin dne in python.
+    if K_known is not None: 
         K = K_known
     else:
         ratios = np.divide(Dt[m_sorting[0:n-1]], Dt[m_sorting[1:n]])
