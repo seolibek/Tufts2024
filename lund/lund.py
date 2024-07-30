@@ -41,6 +41,9 @@ def LearningbyUnsupervisedNonlinearDiffusion(X, t, G, p, K_known=None):
 
 
     # compute rho_t(x), stored as rt
+    print("Shape of DiffusionDistance:", DiffusionDistance.shape)
+    print("Shape of p:", p.shape)
+
     rt = np.zeros(n)
     for i in range(n):
         if p[i] != np.max(p):
