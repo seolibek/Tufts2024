@@ -147,28 +147,7 @@ end
 
 %% Run M-LUND
 
-% % After loading the data
-% [X, Y] = extract_salinasA();
-% 
-% % Apply PCA for dimensionality reduction
-% [coeff, score, latent] = pca(X);
-% explained = cumsum(latent) / sum(latent);
-% numComponents = find(explained >= 0.95, 1); % Keep 95% of variance
-% X_reduced = score(:, 1:numComponents);
-% 
-% % Use X_reduced instead of X for clustering
-% Clusterings = M_LUND(X_reduced, Hyperparameters);
-% 
-% % Calculate and display accuracy for each non-trivial clustering
-% n = length(X);
-% nt_K = unique(Clusterings.K(and(Clusterings.K>=2, Clusterings.K<n/2)));
-% for k = 1:length(nt_K)
-%     t = find(Clusterings.K == nt_K(k), 1, 'first');
-%     [accuracy, ~] = calculate_clustering_accuracy(Y, Clusterings.Labels(:,t));
-%     disp(['Clustering with K = ', num2str(nt_K(k)), ' (t = ', num2str(t), '):']);
-%     disp(['Accuracy: ', num2str(accuracy * 100, '%.2f'), '%']);
-% end
-% Load SalinasA data
+
 [X, Y] = extract_salinasA();
 data_name = 'SalinasA';
 
@@ -177,29 +156,26 @@ tic;
 Clusterings_original = M_LUND(X, Hyperparameters);
 time_original = toc;
 
-% Apply PCA for dimensionality reduction
+% Apply t-SNE for dimensionality reduction
 tic;
-[coeff, score, latent] = pca(X);
-explained = cumsum(latent) / sum(latent);
-numComponents = find(explained >= 0.95, 1);
-X_reduced = score(:, 1:numComponents);
+rng default % for reproducibility
+X_tsne = tsne(X, 'NumDimensions', 2);
 
-% Run M-LUND on reduced data
-Clusterings_reduced = M_LUND(X_reduced, Hyperparameters);
-time_reduced = toc;
+% Run M-LUND on t-SNE reduced data
+Clusterings_tsne = M_LUND(X_tsne, Hyperparameters);
+time_tsne = toc;
 
-% After running M-LUND on both original and reduced data
-
+% After running M-LUND on both original and t-SNE reduced data
 n = length(X);
 nt_K_original = unique(Clusterings_original.K(and(Clusterings_original.K>=2, Clusterings_original.K<n/2)));
-nt_K_reduced = unique(Clusterings_reduced.K(and(Clusterings_reduced.K>=2, Clusterings_reduced.K<n/2)));
+nt_K_tsne = unique(Clusterings_tsne.K(and(Clusterings_tsne.K>=2, Clusterings_tsne.K<n/2)));
 
 % Combine unique K values from both clusterings
-nt_K = unique([nt_K_original; nt_K_reduced]);
+nt_K = unique([nt_K_original; nt_K_tsne]);
 
 for k = 1:length(nt_K)
     t_original = find(Clusterings_original.K == nt_K(k), 1, 'first');
-    t_reduced = find(Clusterings_reduced.K == nt_K(k), 1, 'first');
+    t_tsne = find(Clusterings_tsne.K == nt_K(k), 1, 'first');
     
     if ~isempty(t_original)
         [accuracy_original, ~] = calculate_clustering_accuracy(Y, Clusterings_original.Labels(:,t_original));
@@ -208,23 +184,31 @@ for k = 1:length(nt_K)
         disp(['Original data: No clustering found for K = ', num2str(nt_K(k))]);
     end
     
-    if ~isempty(t_reduced)
-        [accuracy_reduced, ~] = calculate_clustering_accuracy(Y, Clusterings_reduced.Labels(:,t_reduced));
-        disp(['Reduced data accuracy (K = ', num2str(nt_K(k)), '): ', num2str(accuracy_reduced * 100, '%.2f'), '%']);
+    if ~isempty(t_tsne)
+        [accuracy_tsne, ~] = calculate_clustering_accuracy(Y, Clusterings_tsne.Labels(:,t_tsne));
+        disp(['t-SNE reduced data accuracy (K = ', num2str(nt_K(k)), '): ', num2str(accuracy_tsne * 100, '%.2f'), '%']);
     else
-        disp(['Reduced data: No clustering found for K = ', num2str(nt_K(k))]);
+        disp(['t-SNE reduced data: No clustering found for K = ', num2str(nt_K(k))]);
     end
     
     disp('---');
 end
 
 disp(['Time for original data: ', num2str(time_original), ' seconds']);
-disp(['Time for PCA Reduced data (including PCA): ', num2str(time_reduced), ' seconds']);
+disp(['Time for t-SNE reduced data (including t-SNE): ', num2str(time_tsne), ' seconds']);
 
 % Continue with the rest of your script (visualization, etc.)
 if plot_on
     results_plot_original = plot_results(X, Clusterings_original, data_name, sc_on);
-    results_plot_reduced = plot_results(X_reduced, Clusterings_reduced, [data_name '_reduced'], sc_on);
+    results_plot_tsne = plot_results(X_tsne, Clusterings_tsne, [data_name '_tsne'], sc_on);
+    
+    % Additional visualization for t-SNE reduced data
+    figure;
+    scatter(X_tsne(:,1), X_tsne(:,2), 10, Y, 'filled');
+    title('t-SNE of Salinas A data');
+    xlabel('t-SNE 1');
+    ylabel('t-SNE 2');
+    colorbar;
 end
 
 %% 
